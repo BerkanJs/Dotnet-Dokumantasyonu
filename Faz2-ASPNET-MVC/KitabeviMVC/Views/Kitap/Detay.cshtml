@@ -1,0 +1,48 @@
+@model KitabeviMVC.Models.ViewModels.KitapFormViewModel
+
+@{
+    ViewData["Title"] = Model.Baslik;
+}
+
+@* TempData — Ekle veya Güncelle sonrası PRG ile buraya gelindi *@
+@if (TempData["BasariMesaji"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        @TempData["BasariMesaji"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<div class="card" style="max-width: 600px;">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h4 class="mb-0">@Model.Baslik</h4>
+        <span class="badge bg-secondary">@Model.Kategori</span>
+    </div>
+    <div class="card-body">
+        <dl class="row mb-0">
+            <dt class="col-sm-4">Yazar</dt>
+            <dd class="col-sm-8">@Model.Yazar</dd>
+
+            <dt class="col-sm-4">Fiyat</dt>
+            <dd class="col-sm-8">@Model.Fiyat.ToString("C")</dd>
+
+            <dt class="col-sm-4">Stok</dt>
+            <dd class="col-sm-8">
+                @if (Model.StokAdedi == 0)
+                {
+                    <span class="text-danger fw-bold">Tükendi</span>
+                }
+                else
+                {
+                    @($"{Model.StokAdedi} adet")
+                }
+            </dd>
+        </dl>
+    </div>
+    <div class="card-footer d-flex gap-2">
+        <a asp-controller="Kitap" asp-action="Duzenle" asp-route-id="@Model.Id"
+           class="btn btn-outline-secondary btn-sm">Düzenle</a>
+
+        <a asp-controller="Kitap" asp-action="Liste" class="btn btn-outline-dark btn-sm">Listeye Dön</a>
+    </div>
+</div>

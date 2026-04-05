@@ -1,0 +1,81 @@
+@* @model — bu view'ın beklediği veri tipi.
+   Controller'da return View(model) ile gönderilen nesne bu tipe cast edilir. *@
+@model IReadOnlyList<KitabeviMVC.Models.ViewModels.KitapListeViewModel>
+
+@{
+    ViewData["Title"] = "Kitaplar";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>Kitap Listesi</h2>
+    @* asp-controller + asp-action → href="/kitaplar/ekle" otomatik üretilir *@
+    <a asp-controller="Kitap" asp-action="Ekle" class="btn btn-primary">+ Yeni Kitap</a>
+</div>
+
+@* TempData mesajı — PRG sonrası başarı bildirimi *@
+@if (TempData["BasariMesaji"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        @TempData["BasariMesaji"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+@if (!Model.Any())
+{
+    <div class="alert alert-info">Henüz kitap eklenmemiş.</div>
+}
+else
+{
+    <table class="table table-striped table-hover">
+        <thead class="table-dark">
+            <tr>
+                <th>Başlık</th>
+                <th>Yazar</th>
+                <th>Kategori</th>
+                <th class="text-end">Fiyat</th>
+                <th class="text-center">Stok</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @* @foreach — Razor'da C# döngüsü, her kitap için <tr> üretir *@
+            @foreach (var kitap in Model)
+            {
+                <tr>
+                    <td>@kitap.Baslik</td>
+                    <td>@kitap.Yazar</td>
+                    <td><span class="badge bg-secondary">@kitap.Kategori</span></td>
+                    @* .ToString("C") → para birimi formatı: ₺89,00 *@
+                    <td class="text-end">@kitap.Fiyat.ToString("C")</td>
+                    <td class="text-center">
+                        @if (kitap.StokAdedi == 0)
+                        {
+                            <span class="badge bg-danger">Tükendi</span>
+                        }
+                        else
+                        {
+                            @kitap.StokAdedi
+                        }
+                    </td>
+                    <td class="text-end">
+                        @* asp-route-id → URL'deki {id} segmentini doldurur: /kitaplar/detay/1 *@
+                        <a asp-controller="Kitap" asp-action="Detay" asp-route-id="@kitap.Id"
+                           class="btn btn-sm btn-outline-primary">Detay</a>
+
+                        <a asp-controller="Kitap" asp-action="Duzenle" asp-route-id="@kitap.Id"
+                           class="btn btn-sm btn-outline-secondary">Düzenle</a>
+
+                        @* Silme POST — GET ile silme yapılmaz (bot/prefetch riski) *@
+                        <form asp-controller="Kitap" asp-action="Sil" asp-route-id="@kitap.Id"
+                              method="post" class="d-inline"
+                              onsubmit="return confirm('@kitap.Baslik silinsin mi?')">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Sil</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}

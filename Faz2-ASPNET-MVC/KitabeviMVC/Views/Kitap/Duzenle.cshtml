@@ -1,0 +1,63 @@
+@model KitabeviMVC.Models.ViewModels.KitapFormViewModel
+
+@{
+    ViewData["Title"] = $"Düzenle: {Model.Baslik}";
+}
+
+<h2>Kitap Düzenle</h2>
+
+<form asp-controller="Kitap" asp-action="Duzenle" asp-route-id="@Model.Id" method="post" style="max-width: 500px;">
+    @Html.AntiForgeryToken()
+
+    @* Id gizli alan olarak formda taşınır — URL ile uyum sağlanır *@
+    <input asp-for="Id" type="hidden" />
+
+    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+    <div class="mb-3">
+        <label asp-for="Baslik" class="form-label"></label>
+        <input asp-for="Baslik" class="form-control" />
+        <span asp-validation-for="Baslik" class="text-danger small"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="Yazar" class="form-label"></label>
+        <input asp-for="Yazar" class="form-control" />
+        <span asp-validation-for="Yazar" class="text-danger small"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="Kategori" class="form-label"></label>
+        <select asp-for="Kategori" class="form-select">
+            <option value="">-- Seçiniz --</option>
+            <option>Roman</option>
+            <option>Tarih</option>
+            <option>Kişisel</option>
+            <option>Bilim</option>
+            <option>Teknik</option>
+        </select>
+        <span asp-validation-for="Kategori" class="text-danger small"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="Fiyat" class="form-label"></label>
+        <input asp-for="Fiyat" class="form-control" type="number" step="0.01" min="0" />
+        <span asp-validation-for="Fiyat" class="text-danger small"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="StokAdedi" class="form-label"></label>
+        <input asp-for="StokAdedi" class="form-control" type="number" min="0" />
+        <span asp-validation-for="StokAdedi" class="text-danger small"></span>
+    </div>
+
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">Güncelle</button>
+        <a asp-controller="Kitap" asp-action="Detay" asp-route-id="@Model.Id"
+           class="btn btn-outline-secondary">İptal</a>
+    </div>
+</form>
+
+@section Scripts {
+    @{ await Html.RenderPartialAsync("_ValidationScriptsPartial"); }
+}
