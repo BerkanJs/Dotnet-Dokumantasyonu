@@ -3,11 +3,14 @@ using KitabeviMVC.Models.ViewModels;
 
 namespace KitabeviMVC.Services;
 
-// Gün 18: İş mantığı controller'da değil, servis katmanında.
-// Controller sadece koordine eder — servisi çağır, sonucu view'a ilet.
+// Gün 18: In-memory liste — test ve geliştirme ortamı için.
+// Gün 29: IKitapServisi async'e çevrildi → Task.FromResult ile uyum sağlandı.
 //
-// Singleton kaydedildi (Program.cs): uygulama boyunca tek instance.
-// Gerçek projede veritabanı (EF Core) kullanılır; şimdilik in-memory liste.
+// Task.FromResult(T): zaten hazır değeri Task'a sarar — I/O beklenmez.
+// Gerçek async işlem yok; arayüz uyumluluğu için sarmalanıyor.
+//
+// Bu sınıf artık birim testlerde "gerçek DB olmadan IKitapServisi test et"
+// senaryosunda kullanılabilir (test double / fake).
 public class KitapServisi : IKitapServisi
 {
     private readonly List<Kitap> _kitaplar =
@@ -21,24 +24,30 @@ public class KitapServisi : IKitapServisi
 
     private int _sonrakiId => _kitaplar.Max(k => k.Id) + 1;
 
-    public IReadOnlyList<KitapListeViewModel> HepsiniGetir() =>
-        _kitaplar
+    public Task<IReadOnlyList<KitapListeViewModel>> HepsiniGetirAsync()
+    {
+        IReadOnlyList<KitapListeViewModel> liste = _kitaplar
             .OrderBy(k => k.Baslik)
             .Select(k => new KitapListeViewModel(k.Id, k.Baslik, k.Yazar, k.Fiyat, k.Kategori, k.StokAdedi))
             .ToList();
+        return Task.FromResult(liste);
+    }
 
-    public IReadOnlyList<KitapListeViewModel> KategoriyeGoreGetir(string kategori) =>
-        _kitaplar
+    public Task<IReadOnlyList<KitapListeViewModel>> KategoriyeGoreGetirAsync(string kategori)
+    {
+        IReadOnlyList<KitapListeViewModel> liste = _kitaplar
             .Where(k => k.Kategori.Equals(kategori, StringComparison.OrdinalIgnoreCase))
             .Select(k => new KitapListeViewModel(k.Id, k.Baslik, k.Yazar, k.Fiyat, k.Kategori, k.StokAdedi))
             .ToList();
+        return Task.FromResult(liste);
+    }
 
-    public KitapFormViewModel? BulById(int id)
+    public Task<KitapFormViewModel?> BulByIdAsync(int id)
     {
         var kitap = _kitaplar.FirstOrDefault(k => k.Id == id);
-        if (kitap is null) return null;
+        if (kitap is null) return Task.FromResult<KitapFormViewModel?>(null);
 
-        return new KitapFormViewModel
+        var vm = new KitapFormViewModel
         {
             Id        = kitap.Id,
             Baslik    = kitap.Baslik,
@@ -47,9 +56,10 @@ public class KitapServisi : IKitapServisi
             Kategori  = kitap.Kategori,
             StokAdedi = kitap.StokAdedi
         };
+        return Task.FromResult<KitapFormViewModel?>(vm);
     }
 
-    public int Ekle(KitapFormViewModel model)
+    public Task<int> EkleAsync(KitapFormViewModel model)
     {
         var kitap = new Kitap
         {
@@ -61,32 +71,35 @@ public class KitapServisi : IKitapServisi
             StokAdedi = model.StokAdedi
         };
         _kitaplar.Add(kitap);
-        return kitap.Id;
+        return Task.FromResult(kitap.Id);
     }
 
-    public bool Guncelle(KitapFormViewModel model)
+    public Task<bool> GuncelleAsync(KitapFormViewModel model)
     {
         var kitap = _kitaplar.FirstOrDefault(k => k.Id == model.Id);
-        if (kitap is null) return false;
+        if (kitap is null) return Task.FromResult(false);
 
         kitap.Baslik    = model.Baslik;
         kitap.Yazar     = model.Yazar;
         kitap.Fiyat     = model.Fiyat;
         kitap.Kategori  = model.Kategori;
         kitap.StokAdedi = model.StokAdedi;
-        return true;
+        return Task.FromResult(true);
     }
 
-    public bool Sil(int id)
+    public Task<bool> SilAsync(int id)
     {
         var kitap = _kitaplar.FirstOrDefault(k => k.Id == id);
-        if (kitap is null) return false;
+        if (kitap is null) return Task.FromResult(false);
 
         _kitaplar.Remove(kitap);
-        return true;
+        return Task.FromResult(true);
     }
 
-    public bool BaslikVarMi(string baslik, int haricId = 0) =>
-        _kitaplar.Any(k => k.Baslik.Equals(baslik, StringComparison.OrdinalIgnoreCase)
-                        && k.Id != haricId);
+    public Task<bool> BaslikVarMiAsync(string baslik, int haricId = 0)
+    {
+        var varMi = _kitaplar.Any(k =>
+            k.Baslik.Equals(baslik, StringComparison.OrdinalIgnoreCase) && k.Id != haricId);
+        return Task.FromResult(varMi);
+    }
 }

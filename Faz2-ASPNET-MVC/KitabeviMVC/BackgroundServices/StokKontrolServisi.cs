@@ -54,16 +54,16 @@ public class StokKontrolServisi : BackgroundService
         _logger.LogInformation("[StokKontrol] Servis durduruldu.");
     }
 
-    private Task StokKontrolEt(CancellationToken stoppingToken)
+    private async Task StokKontrolEt(CancellationToken stoppingToken)
     {
         // Her döngüde yeni bir Scoped scope aç → Scoped servislere güvenli erişim.
-        // "using" → scope d��ngü bitince dispose edilir, bellek sızıntısı olmaz.
+        // "using" → scope döngü bitince dispose edilir, bellek sızıntısı olmaz.
         using var scope = _scopeFactory.CreateScope();
         var kitapServisi = scope.ServiceProvider.GetRequiredService<IKitapServisi>();
 
         try
         {
-            var tumKitaplar = kitapServisi.HepsiniGetir();
+            var tumKitaplar = await kitapServisi.HepsiniGetirAsync();
 
             // LINQ: stok eşiğin altında olan kitapları bul
             var dusukStokluKitaplar = tumKitaplar
@@ -73,7 +73,7 @@ public class StokKontrolServisi : BackgroundService
             if (dusukStokluKitaplar.Count == 0)
             {
                 _logger.LogDebug("[StokKontrol] Tüm kitaplar yeterli stokta.");
-                return Task.CompletedTask;
+                return;
             }
 
             // Her düşük stoklu kitap için uyarı log'u
@@ -96,6 +96,5 @@ public class StokKontrolServisi : BackgroundService
             _logger.LogError(ex, "[StokKontrol] Stok kontrolü sırasında hata oluştu.");
         }
 
-        return Task.CompletedTask;
     }
 }

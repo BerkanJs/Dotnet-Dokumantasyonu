@@ -58,7 +58,7 @@ public class KitabeviJoblar
     {
         _logger.LogInformation("[Hangfire] Günlük stok raporu oluşturuluyor...");
 
-        var tumKitaplar = _kitapServisi.HepsiniGetir();
+        var tumKitaplar = await _kitapServisi.HepsiniGetirAsync();
 
         var kritikStok = tumKitaplar.Where(k => k.StokAdedi == 0).ToList();
         var dusukStok  = tumKitaplar.Where(k => k.StokAdedi is > 0 and < 5).ToList();

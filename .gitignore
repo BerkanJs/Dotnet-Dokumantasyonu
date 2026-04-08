@@ -1,0 +1,62 @@
+# ─── .NET build çıktıları ───────────────────────────────────────────
+bin/
+obj/
+*.dll
+*.exe
+*.pdb
+*.cache
+*.log
+
+# ─── NuGet ──────────────────────────────────────────────────────────
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# ─── Visual Studio ──────────────────────────────────────────────────
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.vcxproj.filters
+
+# ─── Rider / JetBrains ──────────────────────────────────────────────
+.idea/
+*.sln.iml
+
+# ─── VS Code ────────────────────────────────────────────────────────
+.vscode/
+
+# ─── Claude Code ────────────────────────────────────────────────────
+.claude/
+
+# ─── Test sonuçları ─────────────────────────────────────────────────
+TestResults/
+*.trx
+*.coveragexml
+coverage/
+*.coverage
+
+# ─── Ortama özel ayarlar (şifreler, local bağlantı dizeleri) ────────
+appsettings.Development.json
+appsettings.Local.json
+secrets.json
+*.pfx
+*.p12
+
+# ─── OS dosyaları ───────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─── Node (wwwroot paketleri için) ──────────────────────────────────
+node_modules/
+npm-debug.log*
+
+# ─── Publish çıktısı ────────────────────────────────────────────────
+publish/
+**/Properties/PublishProfiles/

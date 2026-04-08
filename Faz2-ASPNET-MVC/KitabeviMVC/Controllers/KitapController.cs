@@ -8,16 +8,11 @@ using Microsoft.AspNetCore.Mvc;
 namespace KitabeviMVC.Controllers;
 
 // ─────────────────────────────────────────────────────────────────────
-// Gün 19: [TypeFilter] — Controller seviyesi filter.
+// Gün 29: Tüm action'lar async'e çevrildi.
 //
-// [TypeFilter(typeof(ValidationFilter))] → bu controller'daki tüm
-// action'larda ValidationFilter çalışır.
-//
-// TypeFilter: filter'ı DI container üzerinden oluşturur.
-// "typeof(ValidationFilter)" → filter'ın tip bilgisi, "new" demiyoruz.
-//
-// Farkı global filter'dan: sadece bu controller etkilenir.
-// HomeController'daki action'larda ValidationFilter çalışmaz.
+// IKitapServisi artık async metodlar sunuyor (EF Core uyumu).
+// Controller action'ları async Task<IActionResult> döndürür;
+// ASP.NET Core pipeline bunu otomatik olarak yönetir.
 // ─────────────────────────────────────────────────────────────────────
 [Route("kitaplar")]
 [TypeFilter(typeof(ValidationFilter))]
@@ -25,9 +20,6 @@ public class KitapController : Controller
 {
     private readonly IKitapServisi _kitapServisi;
     private readonly ILogger<KitapController> _logger;
-
-    // Gün 20: IAuthorizationService → resource-based authorization için.
-    // [Authorize] attribute ile yapılamayan "bu kaydın sahibi mi?" kontrolünü yapar.
     private readonly IAuthorizationService _authService;
 
     public KitapController(
@@ -42,31 +34,22 @@ public class KitapController : Controller
 
     // ─────────────────────────────────────────────────────────────
     // GET /kitaplar
-    //
-    // return View(model) → Views/Kitap/Liste.cshtml dosyasını
-    // model ile birlikte render eder.
-    //
-    // ViewData["Title"] → _Layout.cshtml'deki <title> etiketine gider.
     // ─────────────────────────────────────────────────────────────
     [HttpGet("")]
-    public IActionResult Liste()
+    public async Task<IActionResult> Liste()
     {
         ViewData["Title"] = "Kitaplar";
-        var model = _kitapServisi.HepsiniGetir();
+        var model = await _kitapServisi.HepsiniGetirAsync();
         return View(model);
     }
 
     // ─────────────────────────────────────────────────────────────
     // GET /kitaplar/detay/42
-    //
-    // Kayıt bulunamazsa NotFound() → 404 döner.
-    // Burada return type ActionResult<T> yerine IActionResult —
-    // çünkü View döndürüyoruz, tip bilgisi Swagger'a gerek yok.
     // ─────────────────────────────────────────────────────────────
     [HttpGet("detay/{id:int}")]
-    public IActionResult Detay(int id)
+    public async Task<IActionResult> Detay(int id)
     {
-        var model = _kitapServisi.BulById(id);
+        var model = await _kitapServisi.BulByIdAsync(id);
 
         if (model is null)
             return NotFound();
@@ -77,9 +60,6 @@ public class KitapController : Controller
 
     // ─────────────────────────────────────────────────────────────
     // GET /kitaplar/ekle → boş formu göster
-    //
-    // Gün 20: [Authorize(Policy = "KitapEkleme")] → Admin veya Editor rolü gerekli.
-    // Giriş yapılmamışsa /hesap/giris?ReturnUrl=/kitaplar/ekle'ye yönlendirilir.
     // ─────────────────────────────────────────────────────────────
     [Authorize(Policy = "KitapEkleme")]
     [HttpGet("ekle")]
@@ -91,66 +71,41 @@ public class KitapController : Controller
 
     // ─────────────────────────────────────────────────────────────
     // POST /kitaplar/ekle → formu kaydet
-    //
-    // PRG Pattern (Post-Redirect-Get):
-    //   - Başarılı → RedirectToAction (302)
-    //   - Hatalı   → return View(model) (ModelState hataları view'a gider)
-    //
-    // Sayfayı yenileme → POST değil, GET tekrar eder. Çifte kayıt olmaz.
-    //
-    // [ValidateAntiForgeryToken] → CSRF koruması.
-    // View'daki form otomatik gizli token üretir, burada doğrulanır.
     // ─────────────────────────────────────────────────────────────
     [Authorize(Policy = "KitapEkleme")]
     [HttpPost("ekle")]
     [ValidateAntiForgeryToken]
-    public IActionResult Ekle(KitapFormViewModel model)
+    public async Task<IActionResult> Ekle(KitapFormViewModel model)
     {
-        // ModelState.IsValid kontrolü burada yok — ValidationFilter halletti.
-        // Action'a geldiysek model geçerli demektir.
-
-        // Attribute ile yapılamayan iş kuralı kontrolü — DB'ye gidecek
-        if (_kitapServisi.BaslikVarMi(model.Baslik))
+        if (await _kitapServisi.BaslikVarMiAsync(model.Baslik))
         {
-            // "Baslik" → hangi form alanına ait hata olduğunu belirtir
             ModelState.AddModelError(nameof(model.Baslik), "Bu başlıkta bir kitap zaten mevcut.");
             ViewData["Title"] = "Yeni Kitap Ekle";
             return View(model);
         }
 
-        var yeniId = _kitapServisi.Ekle(model);
+        var yeniId = await _kitapServisi.EkleAsync(model);
         _logger.LogInformation("Kitap eklendi: {Baslik} (ID={Id})", model.Baslik, yeniId);
 
-        // TempData: redirect'ten sonraki ilk request'te okunur, sonra silinir.
-        // ViewData burada işe yaramaz — redirect yeni bir request başlatır.
         TempData["BasariMesaji"] = $"'{model.Baslik}' başarıyla eklendi.";
-
-        // PRG: POST bitti → GET'e yönlendir
         return RedirectToAction(nameof(Detay), new { id = yeniId });
     }
 
     // ─────────────────────────────────────────────────────────────
     // GET /kitaplar/duzenle/42 → dolu formu göster
-    //
-    // Gün 20: Resource-based authorization.
-    // Kitabı kim ekledi? Sadece o veya Admin düzenleyebilir.
-    // [Authorize] attribute yetmez — kaydı DB'den çekmeden bilemeyiz.
     // ─────────────────────────────────────────────────────────────
-    [Authorize] // en az giriş yapmış olmak gerekli — handler daha ince kontrolü yapar
+    [Authorize]
     [HttpGet("duzenle/{id:int}")]
     public async Task<IActionResult> Duzenle(int id)
     {
-        var model = _kitapServisi.BulById(id);
+        var model = await _kitapServisi.BulByIdAsync(id);
 
         if (model is null)
             return NotFound();
 
-        // Resource-based yetki kontrolü: bu kitabı düzenleme hakkı var mı?
-        // "KitapDuzenleme" policy → KitapDuzenlemeHandler çalışır.
         var yetki = await _authService.AuthorizeAsync(User, model, "KitapDuzenleme");
-
         if (!yetki.Succeeded)
-            return Forbid(); // 403 — giriş yapmış ama bu kitaba yetkisi yok
+            return Forbid();
 
         ViewData["Title"] = $"Düzenle: {model.Baslik}";
         return View(model);
@@ -164,26 +119,21 @@ public class KitapController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Duzenle(int id, KitapFormViewModel model)
     {
-        // Route'daki id ile form body'sindeki model.Id uyuşmalı
         if (id != model.Id)
             return BadRequest();
 
-        // ModelState.IsValid kontrolü burada yok — ValidationFilter halletti.
-
-        if (_kitapServisi.BaslikVarMi(model.Baslik, haricId: id))
+        if (await _kitapServisi.BaslikVarMiAsync(model.Baslik, haricId: id))
         {
             ModelState.AddModelError(nameof(model.Baslik), "Bu başlıkta başka bir kitap zaten mevcut.");
             ViewData["Title"] = $"Düzenle: {model.Baslik}";
             return View(model);
         }
 
-        // POST'ta da yetki kontrolü — GET'ten geçmiş olmak yeterli değil
         var yetki = await _authService.AuthorizeAsync(User, model, "KitapDuzenleme");
         if (!yetki.Succeeded)
             return Forbid();
 
-        var basarili = _kitapServisi.Guncelle(model);
-
+        var basarili = await _kitapServisi.GuncelleAsync(model);
         if (!basarili)
             return NotFound();
 
@@ -195,23 +145,17 @@ public class KitapController : Controller
 
     // ─────────────────────────────────────────────────────────────
     // POST /kitaplar/sil/42
-    //
-    // Silme işlemi GET ile yapılmamalı — bot veya prefetch tarayıcılar
-    // GET isteklerini otomatik tetikleyebilir. POST zorunlu.
-    //
-    // Gün 20: Sadece Admin silebilir — "KitapSilme" policy.
     // ─────────────────────────────────────────────────────────────
     [Authorize(Policy = "KitapSilme")]
     [HttpPost("sil/{id:int}")]
     [ValidateAntiForgeryToken]
-    public IActionResult Sil(int id)
+    public async Task<IActionResult> Sil(int id)
     {
-        var kitap = _kitapServisi.BulById(id);
-
+        var kitap = await _kitapServisi.BulByIdAsync(id);
         if (kitap is null)
             return NotFound();
 
-        _kitapServisi.Sil(id);
+        await _kitapServisi.SilAsync(id);
         _logger.LogInformation("Kitap silindi: ID={Id}", id);
 
         TempData["BasariMesaji"] = $"'{kitap.Baslik}' silindi.";

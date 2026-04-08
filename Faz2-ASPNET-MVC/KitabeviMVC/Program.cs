@@ -12,6 +12,7 @@ using KitabeviMVC.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -158,9 +159,18 @@ builder.Services.AddApiVersioning(options =>
 // Scoped: her request'te ayrı instance — ileride DbContext kullanırsa Scoped olmalı.
 builder.Services.AddScoped<IAuthorizationHandler, KitapDuzenlemeHandler>();
 
-// EF Core — bağlantı dizesi appsettings.json'dan gelir
+// ─────────────────────────────────────────────────────────────────────
+// Gün 29: DbContext kaydı.
+//
+// Geliştirme & öğrenme: UseInMemoryDatabase → SQL Server gerekmez.
+// Production'da değiştirmek için sadece bu bloğu güncelle:
+//   options.UseSqlServer(builder.Configuration.GetConnectionString("Default"))
+//
+// AddDbContext → varsayılan olarak SCOPED kaydeder.
+// Her HTTP request için yeni DbContext → Unit of Work pattern.
+// ─────────────────────────────────────────────────────────────────────
 builder.Services.AddDbContext<KitabeviDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseInMemoryDatabase("KitabeviDb"));
 
 // ─────────────────────────────────────────────────────────
 // Gün 16: Konfigürasyon — appsettings.json → C# sınıfına bağlama
@@ -177,9 +187,41 @@ builder.Services.AddDbContext<KitabeviDbContext>(options =>
 builder.Services.Configure<JwtAyarlari>(
     builder.Configuration.GetSection("Jwt"));
 
-// Gün 18: KitapServisi — in-memory veri, Singleton (uygulama boyunca tek liste)
-// Gerçek projede AddScoped<IKitapServisi, KitapServisi>() olur — her request ayrı DB context alır
-builder.Services.AddSingleton<IKitapServisi, KitapServisi>();
+// ─────────────────────────────────────────────────────────────────────
+// Gün 26: IMemoryCache — süreç içi bellek cache'i.
+//
+// SizeLimit = 1024: toplam cache kapasitesi (birim sen tanımlarsın).
+// Her cache girdisi .SetSize(n) ile kaç birim kapladığını bildirir.
+// SizeLimit olmadan belleği sınırsız tüketir — production'da mutlaka belirle.
+// ─────────────────────────────────────────────────────────────────────
+builder.Services.AddMemoryCache(options =>
+{
+    options.SizeLimit = 1024;
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// Gün 29: EF Core tabanlı servis kaydı.
+//
+// EfKitapServisi → Scoped (DbContext Scoped olduğu için zorunlu).
+// CachedKitapServisi → Scoped (içteki EfKitapServisi Scoped olduğu için).
+//
+// DI çözümleme:
+//   IKitapServisi istendi → CachedKitapServisi verilir (Scoped)
+//   CachedKitapServisi içindeki IKitapServisi → EfKitapServisi verilir (Scoped)
+//   EfKitapServisi içindeki KitabeviDbContext → aynı request'in DbContext'i (Scoped)
+//
+// Gün 26 farkı: Gün 26'da hem KitapServisi hem CachedKitapServisi Singleton'dı.
+// EF Core'a geçince Scoped zorunlu oldu — "cannot consume scoped from singleton" kuralı.
+//
+// Cache katmanını devre dışı bırakmak → sadece bu satırı kullan:
+//   builder.Services.AddScoped<IKitapServisi, EfKitapServisi>();
+// ─────────────────────────────────────────────────────────────────────
+builder.Services.AddScoped<EfKitapServisi>();
+builder.Services.AddScoped<IKitapServisi>(sp =>
+    new CachedKitapServisi(
+        sp.GetRequiredService<EfKitapServisi>(),
+        sp.GetRequiredService<IMemoryCache>(),
+        sp.GetRequiredService<ILogger<CachedKitapServisi>>()));
 
 // TokenServisi — IOptions<T> kullanır (ayarlar uygulama boyunca sabit)
 builder.Services.AddSingleton<TokenServisi>();
@@ -192,6 +234,31 @@ builder.Services.AddSingleton<TokenServisiCanlı>();
 builder.Services.AddScoped<TokenServisiScoped>();
 
 var app = builder.Build();
+
+// ─────────────────────────────────────────────────────────────────────
+// Gün 29: InMemory DB seed — uygulama başlayınca başlangıç verilerini ekle.
+//
+// HasData() InMemory provider'da çalışmaz (migration tabanlı).
+// Çözüm: uygulama başlarken scope açıp DbContext'e doğrudan ver.
+//
+// Production'da: Database.Migrate() + Seeder servisi kullanılır.
+// ─────────────────────────────────────────────────────────────────────
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<KitabeviDbContext>();
+
+    if (!db.Kitaplar.Any())
+    {
+        db.Kitaplar.AddRange(
+            new KitabeviMVC.Models.Entities.Kitap { Id = 1, Baslik = "Clean Code",          Yazar = "Robert Martin", Fiyat = 45m,  Kategori = "Yazılım",  StokAdedi = 10, EklemeTarihi = DateTime.UtcNow },
+            new KitabeviMVC.Models.Entities.Kitap { Id = 2, Baslik = "DDD",                 Yazar = "Eric Evans",    Fiyat = 85m,  Kategori = "Mimari",   StokAdedi = 5,  EklemeTarihi = DateTime.UtcNow },
+            new KitabeviMVC.Models.Entities.Kitap { Id = 3, Baslik = "The Pragmatic Prog",  Yazar = "Hunt & Thomas", Fiyat = 55m,  Kategori = "Yazılım",  StokAdedi = 8,  EklemeTarihi = DateTime.UtcNow },
+            new KitabeviMVC.Models.Entities.Kitap { Id = 4, Baslik = "Suç ve Ceza",         Yazar = "Dostoyevski",   Fiyat = 89m,  Kategori = "Roman",    StokAdedi = 12, EklemeTarihi = DateTime.UtcNow },
+            new KitabeviMVC.Models.Entities.Kitap { Id = 5, Baslik = "Sapiens",             Yazar = "Harari",        Fiyat = 140m, Kategori = "Tarih",    StokAdedi = 20, EklemeTarihi = DateTime.UtcNow }
+        );
+        db.SaveChanges();
+    }
+}
 
 // ──────────────────────────────────────────────
 // Middleware pipeline — sıra kritik!
@@ -269,10 +336,19 @@ if (app.Environment.IsDevelopment())
 
 // Recurring job kaydı — her gece 02:00'de stok raporu.
 // "AddOrUpdate" → aynı isimle tekrar çağrılırsa günceller, oluşturmaz.
-RecurringJob.AddOrUpdate<KitabeviJoblar>(
-    "gunluk-stok-raporu",
-    j => j.GunlukStokRaporu(),
-    "0 2 * * *"); // cron: dakika=0, saat=2, her gün
+//
+// Gün 27: Test ortamında atlanır — WebApplicationFactory statik Hangfire
+// API'sini başlatmadan önce RecurringJob.AddOrUpdate çağrısı yapar ve
+// "JobStorage.Current has not been initialized" hatasına yol açar.
+// Çözüm: statik API yerine IRecurringJobManager (DI tabanlı) kullanmak
+// doğru yaklaşımdır, ancak bu projede örnek olması için ortam koruması yeterli.
+if (!app.Environment.IsEnvironment("Testing"))
+{
+    RecurringJob.AddOrUpdate<KitabeviJoblar>(
+        "gunluk-stok-raporu",
+        j => j.GunlukStokRaporu(),
+        "0 2 * * *"); // cron: dakika=0, saat=2, her gün
+}
 
 // ─────────────────────────────────────────────────────────────────────
 // Gün 23: Minimal API endpoint'leri — extension metod ile kayıt.
@@ -281,3 +357,13 @@ RecurringJob.AddOrUpdate<KitabeviJoblar>(
 app.MapKitapEndpoints();
 
 app.Run();
+
+// ─────────────────────────────────────────────────────────────────────
+// Gün 27: Integration test için zorunlu.
+//
+// .NET 6+ top-level program'da "Program" sınıfı otomatik üretilir ama
+// internal olarak işaretlenir — test projesi göremez.
+// "public partial class Program" → test projesindeki
+// WebApplicationFactory<Program>'ın bu sınıfa erişmesini sağlar.
+// ─────────────────────────────────────────────────────────────────────
+public partial class Program { }
