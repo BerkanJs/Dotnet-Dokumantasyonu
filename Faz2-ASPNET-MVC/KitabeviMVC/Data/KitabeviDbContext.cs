@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 namespace KitabeviMVC.Data;
 
 // Gün 29: DbContext — Unit of Work + Repository pattern'in EF Core implementasyonu.
+// Gün 33: Composite index (Kategori+Stok), RowVersion (optimistic concurrency) eklendi.
 //
 // Unit of Work: birden fazla değişikliği toplar, tek SaveChanges() ile atomik yazar.
 // Repository:   her DbSet<T>, o entity'ye erişim noktasıdır.
@@ -61,6 +62,39 @@ public class KitabeviDbContext : DbContext
             entity.HasIndex(k => k.Kategori)
                 .HasDatabaseName("IX_Kitaplar_Kategori");
 
+            // ─────────────────────────────────────────────────────────────
+            // Gün 33: Composite Index — Kategori + StokAdedi birlikte.
+            //
+            // Sık çalışan sorgu: WHERE Kategori = ? AND StokAdedi > 0
+            // Tekli index (sadece Kategori): önce kategori filtrelenir,
+            // sonra her satır için StokAdedi okunur → ek I/O.
+            // Composite index: tek B-tree'de iki kolon birlikte → tek okuma.
+            //
+            // Sol-prefix kuralı: Kategori öne geldiği için
+            // "WHERE Kategori = ?" tek başına da bu index'i kullanabilir.
+            // Tersine yazsaydık (StokAdedi, Kategori): "WHERE Kategori = ?"
+            // bu index'i kullanamaz → yanlış sıra.
+            // ─────────────────────────────────────────────────────────────
+            entity.HasIndex(k => new { k.Kategori, k.StokAdedi })
+                .HasDatabaseName("IX_Kitaplar_Kategori_Stok");
+            // composite index tek satırla tanımlanır; EF Core iki kolonu sıraya göre B-tree'ye koyar
+
+            // ─────────────────────────────────────────────────────────────
+            // Gün 33: Optimistic Concurrency — RowVersion konfigürasyonu.
+            //
+            // IsRowVersion(): [Timestamp] attribute'unun Fluent API karşılığı.
+            // EF Core, UPDATE SQL'ine WHERE RowVersion = @originalValue ekler.
+            // DB her UPDATE'te RowVersion'ı otomatik değiştirir.
+            // Eşleşmezse: DbUpdateConcurrencyException fırlatır.
+            //
+            // NOT: InMemory provider IsRowVersion()'ı desteklemez.
+            // Sadece SQL Server (veya gerçek RDBMS) ile çalışır.
+            // ─────────────────────────────────────────────────────────────
+            entity.Property(k => k.RowVersion)
+                .IsRowVersion();
+            // bunu yazmasaydık [Timestamp] attribute tek başına yeterliydi,
+            // ama Fluent API > DataAnnotation kuralına göre burada da belirtiyoruz
+
             // ─────────────────────────────────────────────────────────
             // Gün 29: İlişki tanımı — Kitap (many) ↔ Yazar (one).
             //
@@ -104,10 +138,28 @@ public class KitabeviDbContext : DbContext
         });
 
         // ─────────────────────────────────────────────────────────────────────
-        // Seed data — uygulama başladığında DB'ye ilk veriler eklenir.
+        // Gün 32: HasData() — Migration tabanlı seed.
         //
-        // NOT: InMemory provider'da HasData() çalışmaz (migration kavramı yok).
-        // Seed, Program.cs'te manuel olarak yapılır (bkz. SeedDataAsync).
+        // HasData() ne zaman kullanılır?
+        //   → Nadiren değişen referans veriler: ülke kodları, para birimleri,
+        //     sabit kategori listesi vb.
+        //   → Değiştirilmesi production deployment gerektirse bile sorun olmayan veriler.
+        //
+        // HasData() KULLANILMIYOR çünkü:
+        //   → InMemory provider desteklemez → test ve geliştirme kırılır.
+        //   → Veri değişince yeni migration gerekir (fiyat düzeltmesi = deployment).
+        //   → FK sırası (Yazarlar → Kitaplar) migration'da yönetmek karmaşıklaşır.
+        //   → Bunun yerine DbSeeder kullanılıyor (Services/DbSeeder.cs).
+        //
+        // Eğer kullanılsaydı — örnek olarak:
+        //
+        // modelBuilder.Entity<Yazar>().HasData(
+        //     new Yazar { Id = 1, Ad = "Robert", Soyad = "Martin" }
+        //     // Id zorunlu: HasData migration'a Id bazlı INSERT üretir.
+        //     // Id yazmasaydık EF Core exception fırlatırdı.
+        //     // DateTime.UtcNow yazılmaz: her migration oluşturmada değer
+        //     // değişir, EF "veri değişti" sanır → gereksiz UPDATE migration üretir.
+        // );
         // ─────────────────────────────────────────────────────────────────────
     }
 }

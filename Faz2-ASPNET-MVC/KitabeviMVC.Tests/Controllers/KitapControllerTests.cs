@@ -1,4 +1,3 @@
-using FluentAssertions;
 using KitabeviMVC.Controllers;
 using KitabeviMVC.Models.ViewModels;
 using KitabeviMVC.Services;
@@ -8,7 +7,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
-using Xunit;
 
 namespace KitabeviMVC.Tests.Controllers;
 
@@ -22,6 +20,9 @@ namespace KitabeviMVC.Tests.Controllers;
 // ModelState unit testte varsayılan olarak geçerlidir.
 // ValidationFilter (pipeline) geçtiğini varsayıyoruz.
 //
+// Gün 29: Tüm action'lar async Task<IActionResult> → testler async Task.
+// ReturnsAsync: Moq'un async Setup için karşılığı (Returns → ReturnsAsync).
+//
 // Bağımlılıklar:
 //   IKitapServisi    → Mock
 //   ILogger          → NullLogger (gerçek logger test çıktısını kirletir)
@@ -34,11 +35,18 @@ public class KitapControllerTests
     private static (KitapController controller, Mock<IKitapServisi> mockServis)
         OlusturController()
     {
-        var mockServis = new Mock<IKitapServisi>();
-        var mockAuth   = new Mock<IAuthorizationService>();
-        var logger     = NullLogger<KitapController>.Instance;
+        var mockServis   = new Mock<IKitapServisi>();
+        var mockSorgu    = new Mock<IKitapSorguServisi>();
+        var mockBatch    = new Mock<IKitapBatchServisi>();
+        var mockAuth     = new Mock<IAuthorizationService>();
+        var logger       = NullLogger<KitapController>.Instance;
 
-        var controller = new KitapController(mockServis.Object, logger, mockAuth.Object);
+        var controller = new KitapController(
+            mockServis.Object,
+            mockSorgu.Object,
+            mockBatch.Object,
+            logger,
+            mockAuth.Object);
 
         // ControllerContext: TempData, User, HttpContext için gerekli
         controller.ControllerContext = new ControllerContext
@@ -64,72 +72,73 @@ public class KitapControllerTests
     // ─── Liste (GET /kitaplar) ────────────────────────────────────────
 
     [Fact]
-    public void Liste_HepsiniGetirCagilinca_ViewResultDondurur()
+    public async Task Liste_HepsiniGetirAsyncCagilinca_ViewResultDondurur()
     {
         // Arrange
         var (controller, mockServis) = OlusturController();
-        mockServis.Setup(s => s.HepsiniGetir()).Returns(OrnekListe());
+        mockServis.Setup(s => s.HepsiniGetirAsync()).ReturnsAsync(OrnekListe());
+        // ReturnsAsync: async Task<T> döndüren metodlar için Returns'ün async karşılığı.
 
-        // Act
-        var sonuc = controller.Liste();
+        // Act — Liste action async, await zorunlu
+        var sonuc = await controller.Liste();
 
         // Assert
         sonuc.Should().BeOfType<ViewResult>();
     }
 
     [Fact]
-    public void Liste_ViewResult_ModelKitapListesidir()
+    public async Task Liste_ViewResult_ModelKitapListesidir()
     {
         // Arrange
         var (controller, mockServis) = OlusturController();
-        mockServis.Setup(s => s.HepsiniGetir()).Returns(OrnekListe());
+        mockServis.Setup(s => s.HepsiniGetirAsync()).ReturnsAsync(OrnekListe());
 
         // Act
-        var viewResult = (ViewResult)controller.Liste();
+        var viewResult = (ViewResult)await controller.Liste();
 
         // Assert — view'a gönderilen model doğru tipte
         viewResult.Model.Should().BeAssignableTo<IReadOnlyList<KitapListeViewModel>>();
     }
 
     [Fact]
-    public void Liste_HepsiniGetiriCagirir()
+    public async Task Liste_HepsiniGetirAsyncCagirir()
     {
         var (controller, mockServis) = OlusturController();
-        mockServis.Setup(s => s.HepsiniGetir()).Returns(OrnekListe());
+        mockServis.Setup(s => s.HepsiniGetirAsync()).ReturnsAsync(OrnekListe());
 
-        controller.Liste();
+        await controller.Liste();
 
-        mockServis.Verify(s => s.HepsiniGetir(), Times.Once);
+        mockServis.Verify(s => s.HepsiniGetirAsync(), Times.Once);
     }
 
     // ─── Detay (GET /kitaplar/detay/{id}) ────────────────────────────
 
     [Fact]
-    public void Detay_VarOlanId_ViewResultDondurur()
+    public async Task Detay_VarOlanId_ViewResultDondurur()
     {
         // Arrange
         var (controller, mockServis) = OlusturController();
         mockServis
-            .Setup(s => s.BulById(1))
-            .Returns(new KitapFormViewModel { Id = 1, Baslik = "1984" });
+            .Setup(s => s.BulByIdAsync(1))
+            .ReturnsAsync(new KitapFormViewModel { Id = 1, Baslik = "1984" });
 
         // Act
-        var sonuc = controller.Detay(1);
+        var sonuc = await controller.Detay(1);
 
         // Assert
         sonuc.Should().BeOfType<ViewResult>();
     }
 
     [Fact]
-    public void Detay_VarOlanId_DogruModeleIleViewDondurur()
+    public async Task Detay_VarOlanId_DogruModeleIleViewDondurur()
     {
         // Arrange
         var (controller, mockServis) = OlusturController();
         var kitap = new KitapFormViewModel { Id = 1, Baslik = "1984", Yazar = "Orwell" };
-        mockServis.Setup(s => s.BulById(1)).Returns(kitap);
+        mockServis.Setup(s => s.BulByIdAsync(1)).ReturnsAsync(kitap);
 
         // Act
-        var viewResult = (ViewResult)controller.Detay(1);
+        var viewResult = (ViewResult)await controller.Detay(1);
 
         // Assert — doğru kitap view'a gönderildi
         var model = viewResult.Model.Should().BeOfType<KitapFormViewModel>().Subject;
@@ -138,14 +147,14 @@ public class KitapControllerTests
     }
 
     [Fact]
-    public void Detay_YokOlanId_NotFoundDondurur()
+    public async Task Detay_YokOlanId_NotFoundDondurur()
     {
         // Arrange
         var (controller, mockServis) = OlusturController();
-        mockServis.Setup(s => s.BulById(9999)).Returns((KitapFormViewModel?)null);
+        mockServis.Setup(s => s.BulByIdAsync(9999)).ReturnsAsync((KitapFormViewModel?)null);
 
         // Act
-        var sonuc = controller.Detay(9999);
+        var sonuc = await controller.Detay(9999);
 
         // Assert
         sonuc.Should().BeOfType<NotFoundResult>();
@@ -154,7 +163,7 @@ public class KitapControllerTests
     // ─── Ekle POST (/kitaplar/ekle) ───────────────────────────────────
 
     [Fact]
-    public void Ekle_Post_GecerliModel_EkleMetodunuCagirir()
+    public async Task Ekle_Post_GecerliModel_EkleAsyncMetodunuCagirir()
     {
         // Arrange
         var (controller, mockServis) = OlusturController();
@@ -165,27 +174,27 @@ public class KitapControllerTests
             Kategori = "Roman",
             Fiyat    = 90
         };
-        mockServis.Setup(s => s.BaslikVarMi(model.Baslik, 0)).Returns(false);
-        mockServis.Setup(s => s.Ekle(model)).Returns(6);
+        mockServis.Setup(s => s.BaslikVarMiAsync(model.Baslik, 0)).ReturnsAsync(false);
+        mockServis.Setup(s => s.EkleAsync(model)).ReturnsAsync(6);
 
         // Act
-        controller.Ekle(model);
+        await controller.Ekle(model);
 
         // Assert — servis çağrıldı
-        mockServis.Verify(s => s.Ekle(model), Times.Once);
+        mockServis.Verify(s => s.EkleAsync(model), Times.Once);
     }
 
     [Fact]
-    public void Ekle_Post_GecerliModel_DetayaRedirectEder()
+    public async Task Ekle_Post_GecerliModel_DetayaRedirectEder()
     {
         // Başarılı eklemede PRG pattern: POST → Redirect → GET
         var (controller, mockServis) = OlusturController();
         var model = new KitapFormViewModel { Baslik = "Yeni", Yazar = "Y", Kategori = "Roman" };
-        mockServis.Setup(s => s.BaslikVarMi(model.Baslik, 0)).Returns(false);
-        mockServis.Setup(s => s.Ekle(model)).Returns(6);
+        mockServis.Setup(s => s.BaslikVarMiAsync(model.Baslik, 0)).ReturnsAsync(false);
+        mockServis.Setup(s => s.EkleAsync(model)).ReturnsAsync(6);
 
         // Act
-        var sonuc = controller.Ekle(model);
+        var sonuc = await controller.Ekle(model);
 
         // Assert — Detay action'ına redirect
         var redirect = sonuc.Should().BeOfType<RedirectToActionResult>().Subject;
@@ -194,45 +203,45 @@ public class KitapControllerTests
     }
 
     [Fact]
-    public void Ekle_Post_CakisanBaslik_EkleMetodunuCagirmaz()
+    public async Task Ekle_Post_CakisanBaslik_EkleAsyncMetodunuCagirmaz()
     {
-        // BaslikVarMi true döndürürse → Ekle çağrılmamalı
+        // BaslikVarMiAsync true döndürürse → EkleAsync çağrılmamalı
         var (controller, mockServis) = OlusturController();
         var model = new KitapFormViewModel { Baslik = "1984", Yazar = "Y", Kategori = "Roman" };
-        mockServis.Setup(s => s.BaslikVarMi("1984", 0)).Returns(true); // başlık mevcut
+        mockServis.Setup(s => s.BaslikVarMiAsync("1984", 0)).ReturnsAsync(true); // başlık mevcut
 
         // Act
-        controller.Ekle(model);
+        await controller.Ekle(model);
 
-        // Assert — Ekle çağrılmadı
-        mockServis.Verify(s => s.Ekle(It.IsAny<KitapFormViewModel>()), Times.Never);
+        // Assert — EkleAsync çağrılmadı
+        mockServis.Verify(s => s.EkleAsync(It.IsAny<KitapFormViewModel>()), Times.Never);
     }
 
     [Fact]
-    public void Ekle_Post_CakisanBaslik_ViewTekrarDondurur()
+    public async Task Ekle_Post_CakisanBaslik_ViewTekrarDondurur()
     {
         // Hata durumunda kullanıcı formu tekrar görür
         var (controller, mockServis) = OlusturController();
         var model = new KitapFormViewModel { Baslik = "1984", Yazar = "Y", Kategori = "Roman" };
-        mockServis.Setup(s => s.BaslikVarMi("1984", 0)).Returns(true);
+        mockServis.Setup(s => s.BaslikVarMiAsync("1984", 0)).ReturnsAsync(true);
 
         // Act
-        var sonuc = controller.Ekle(model);
+        var sonuc = await controller.Ekle(model);
 
         // Assert
         sonuc.Should().BeOfType<ViewResult>();
     }
 
     [Fact]
-    public void Ekle_Post_CakisanBaslik_ModelStateHatasiEkler()
+    public async Task Ekle_Post_CakisanBaslik_ModelStateHatasiEkler()
     {
         // ModelState'e "Baslik" için hata eklenmeli
         var (controller, mockServis) = OlusturController();
         var model = new KitapFormViewModel { Baslik = "1984", Yazar = "Y", Kategori = "Roman" };
-        mockServis.Setup(s => s.BaslikVarMi("1984", 0)).Returns(true);
+        mockServis.Setup(s => s.BaslikVarMiAsync("1984", 0)).ReturnsAsync(true);
 
         // Act
-        controller.Ekle(model);
+        await controller.Ekle(model);
 
         // Assert
         controller.ModelState.Should().ContainKey("Baslik");
@@ -241,29 +250,29 @@ public class KitapControllerTests
     // ─── Sil POST (/kitaplar/sil/{id}) ────────────────────────────────
 
     [Fact]
-    public void Sil_VarOlanId_SilMetodunuCagirir()
+    public async Task Sil_VarOlanId_SilAsyncMetodunuCagirir()
     {
         // Arrange
         var (controller, mockServis) = OlusturController();
-        mockServis.Setup(s => s.BulById(1)).Returns(new KitapFormViewModel { Id = 1, Baslik = "1984" });
-        mockServis.Setup(s => s.Sil(1)).Returns(true);
+        mockServis.Setup(s => s.BulByIdAsync(1)).ReturnsAsync(new KitapFormViewModel { Id = 1, Baslik = "1984" });
+        mockServis.Setup(s => s.SilAsync(1)).ReturnsAsync(true);
 
         // Act
-        controller.Sil(1);
+        await controller.Sil(1);
 
         // Assert
-        mockServis.Verify(s => s.Sil(1), Times.Once);
+        mockServis.Verify(s => s.SilAsync(1), Times.Once);
     }
 
     [Fact]
-    public void Sil_VarOlanId_ListeyeRedirectEder()
+    public async Task Sil_VarOlanId_ListeyeRedirectEder()
     {
         var (controller, mockServis) = OlusturController();
-        mockServis.Setup(s => s.BulById(1)).Returns(new KitapFormViewModel { Id = 1, Baslik = "1984" });
-        mockServis.Setup(s => s.Sil(1)).Returns(true);
+        mockServis.Setup(s => s.BulByIdAsync(1)).ReturnsAsync(new KitapFormViewModel { Id = 1, Baslik = "1984" });
+        mockServis.Setup(s => s.SilAsync(1)).ReturnsAsync(true);
 
         // Act
-        var sonuc = controller.Sil(1);
+        var sonuc = await controller.Sil(1);
 
         // Assert
         var redirect = sonuc.Should().BeOfType<RedirectToActionResult>().Subject;
@@ -271,30 +280,30 @@ public class KitapControllerTests
     }
 
     [Fact]
-    public void Sil_YokOlanId_NotFoundDondurur()
+    public async Task Sil_YokOlanId_NotFoundDondurur()
     {
-        // Arrange — BulById null döner → NotFound
+        // Arrange — BulByIdAsync null döner → NotFound
         var (controller, mockServis) = OlusturController();
-        mockServis.Setup(s => s.BulById(9999)).Returns((KitapFormViewModel?)null);
+        mockServis.Setup(s => s.BulByIdAsync(9999)).ReturnsAsync((KitapFormViewModel?)null);
 
         // Act
-        var sonuc = controller.Sil(9999);
+        var sonuc = await controller.Sil(9999);
 
         // Assert
         sonuc.Should().BeOfType<NotFoundResult>();
     }
 
     [Fact]
-    public void Sil_YokOlanId_SilMetodunuCagirmaz()
+    public async Task Sil_YokOlanId_SilAsyncMetodunuCagirmaz()
     {
-        // BulById null dönerse Sil çağrılmamalı
+        // BulByIdAsync null dönerse SilAsync çağrılmamalı
         var (controller, mockServis) = OlusturController();
-        mockServis.Setup(s => s.BulById(9999)).Returns((KitapFormViewModel?)null);
+        mockServis.Setup(s => s.BulByIdAsync(9999)).ReturnsAsync((KitapFormViewModel?)null);
 
         // Act
-        controller.Sil(9999);
+        await controller.Sil(9999);
 
         // Assert
-        mockServis.Verify(s => s.Sil(It.IsAny<int>()), Times.Never);
+        mockServis.Verify(s => s.SilAsync(It.IsAny<int>()), Times.Never);
     }
 }

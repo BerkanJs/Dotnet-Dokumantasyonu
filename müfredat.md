@@ -561,7 +561,7 @@ Kritik iş akışı, orchestration               → Temporal (gelecek)
 
 ---
 
-### Gün 27 — IHttpClientFactory ve Typed HttpClient
+### Gün 28 — IHttpClientFactory ve Typed HttpClient
 
 **Teorik:**
 - `HttpClient` doğrudan `new` ile neden oluşturulmamalı? (socket exhaustion, DNS stale)
@@ -577,14 +577,6 @@ Kritik iş akışı, orchestration               → Temporal (gelecek)
 - Spring `RestTemplate` / `WebClient` → .NET `HttpClient` + `IHttpClientFactory`
 
 ---
-
-### Gün 28 — Hafta 4 Özet
-
-**Mimari soru:**
-- Bir e-ticaret uygulamasında sepet işlemleri için hangi caching stratejisi kullanırsın?
-- Output cache ne zaman distributed cache'in yerini alabilir?
-- Correlation ID'yi hangi katmanda üretmeli, nasıl taşımalısın?
-- `new HttpClient()` her request'te oluşturmak neden production'da sorundur?
 
 ---
 
@@ -652,31 +644,58 @@ Kritik iş akışı, orchestration               → Temporal (gelecek)
 
 ---
 
-### Gün 34 — Dapper: Micro ORM ile Karşılaştırma
+### Gün 34 — Repository Pattern & Unit of Work
 
 **Teorik:**
-- Dapper — lightweight, SQL-first micro ORM
-- EF Core vs Dapper — ne zaman hangisi?
-- CQRS'te command tarafı EF Core, query tarafı Dapper pattern'i
-- `QueryAsync<T>()`, `ExecuteAsync()`
-- Multi-mapping — JOIN result → birden fazla nesne
+- Repository Pattern — veri erişimini soyutla, controller'ı ORM'den koru
+- `IRepository<T>` — generic CRUD arayüzü
+- Entity'ye özel repository — `IKitapRepository : IRepository<Kitap>`
+- Unit of Work — birden fazla repository tek DbContext üzerinden; `SaveAsync()` tek transaction
+- DI kaydı: Scoped (Transient veya Singleton değil — neden?)
+- Test değeri: `FakeRepository` ile DB'siz unit test
 
 ---
 
-### Gün 35 — Hafta 5 Özet
+### Gün 35 — CQRS ve MediatR
 
-**Tekrar soruları:**
-1. `AsNoTracking()` ne zaman kullanılmaz? (Güncelleme yapılacaksa)
-2. N+1 olmadan 3 seviyeli entity ilişkisini nasıl çekersin?
-3. Production'da migration nasıl güvenli çalıştırılır?
-4. EF Core 7'nin `ExecuteUpdate()` metodu ne avantaj sağlar?
-5. CQRS'te neden query tarafında Dapper tercih edilir?
+**Teorik:**
+- CQRS — okuma (Query) ve yazma (Command) modellerini ayır
+- `IRequest<T>` — mesaj tanımı; `IRequestHandler<,>` — mesajı işleyen sınıf
+- Query → `AsNoTracking`, DTO döndür; Command → validation, `SaveChanges`, Id döndür
+- `_mediator.Send()` — handler'ı bul ve çalıştır (controller, handler'ı bilmez)
+- `IPipelineBehavior` — cross-cutting concerns (logging, validation tüm handler'larda otomatik)
+- Feature klasör yapısı — `Features/Kitaplar/KitapListeQuery.cs` vb.
+
+---
+
+### Gün 36 — Serilog ile Yapılandırılmış Loglama
+
+**Teorik:**
+- Structured logging — `{PropertyName}` → JSON'da filtrelenebilir alan
+- Sink: Console (geliştirme), File (prod), Seq/Elasticsearch (ileri)
+- `MinimumLevel.Override` — Microsoft/EF Core namespace'ini sustur
+- `appsettings.json` + `ReadFrom.Configuration` — binary değiştirmeden log seviyesi ayarla
+- `UseSerilogRequestLogging` — her HTTP isteği otomatik loglanır
+- `{@Nesne}` vs `{Nesne}` farkı — serialize et vs ToString()
+
+---
+
+### Gün 37 — Docker ile Containerization
+
+**Teorik:**
+- Image vs Container — şablon vs çalışan örnek
+- Multi-stage Dockerfile: build (SDK ~800MB) → runtime (aspnet ~200MB)
+- Layer cache — `.csproj` önce kopyala + restore → her küçük değişiklikte restore yok
+- Non-root user — güvenlik: `adduser appuser`
+- `docker-compose` — SQL Server + web: `depends_on + healthcheck` ile sıra garantisi
+- Named volume — container silinse de veri kalır
+- Bağlantı dizesi environment variable ile — `ConnectionStrings__Default`
 
 ---
 
 ## Hafta 6 — Test Yazımı: Unit, Integration, Architecture
 
-> Mid+ seviyenin en net göstergesi test yazabilmektir. Testing müfredatta yoktu — eklendi.
+> Mid+ seviyenin en net göstergesi test yazabilmektir.
 > Java'da JUnit/Mockito bilgisi burada doğrudan transfer olur.
 
 ### Bu Haftada Kodlayacaklarımız
@@ -684,7 +703,7 @@ Faz2'deki KitabeviMVC uygulamasına test projesi eklenir. Gerçek uygulama kodu 
 
 ---
 
-### Gün 36 — Test Temelleri: xUnit v3 ve AAA Pattern
+### Gün 38 — Test Temelleri: xUnit v3 ve AAA Pattern
 
 **Teorik:**
 - Unit Test nedir? Neyi test eder, neyi test etmez?
@@ -702,7 +721,7 @@ Faz2'deki KitabeviMVC uygulamasına test projesi eklenir. Gerçek uygulama kodu 
 
 ---
 
-### Gün 37 — Test Doubles: Mock, Stub, Fake, Spy
+### Gün 39 — Test Doubles: Mock, Stub, Fake, Spy
 
 **Teorik:**
 - Test Double türleri — Gerard Meszaros terminolojisi
@@ -722,7 +741,7 @@ Faz2'deki KitabeviMVC uygulamasına test projesi eklenir. Gerçek uygulama kodu 
 
 ---
 
-### Gün 38 — FluentAssertions ve Test Okunabilirliği
+### Gün 40 — FluentAssertions ve Test Okunabilirliği
 
 **Teorik:**
 - FluentAssertions — assertion kütüphanesi, okunabilir hata mesajları
@@ -735,7 +754,7 @@ Faz2'deki KitabeviMVC uygulamasına test projesi eklenir. Gerçek uygulama kodu 
 
 ---
 
-### Gün 39 — Integration Testing: WebApplicationFactory
+### Gün 41 — Integration Testing: WebApplicationFactory
 
 **Teorik:**
 - Unit test vs Integration test farkı — gerçek HTTP pipeline testi
@@ -748,7 +767,7 @@ Faz2'deki KitabeviMVC uygulamasına test projesi eklenir. Gerçek uygulama kodu 
 
 ---
 
-### Gün 40 — TestContainers: Gerçek DB ile Test
+### Gün 42 — TestContainers: Gerçek DB ile Test
 
 **Teorik:**
 - TestContainers — Docker container'ı test içinde ayağa kaldırır
@@ -761,7 +780,7 @@ Faz2'deki KitabeviMVC uygulamasına test projesi eklenir. Gerçek uygulama kodu 
 
 ---
 
-### Gün 41 — Architecture Testing: NetArchTest
+### Gün 43 — Architecture Testing: NetArchTest
 
 **Teorik:**
 - Architecture Test nedir? — Katman kurallarını otomatik doğrula
@@ -781,7 +800,7 @@ Types.InAssembly(domainAssembly)
 
 ---
 
-### Gün 42 — TDD ve Test Stratejisi
+### Gün 44 — TDD ve Test Stratejisi
 
 **Teorik:**
 - TDD (Test-Driven Development) — Red → Green → Refactor döngüsü
@@ -796,14 +815,14 @@ Types.InAssembly(domainAssembly)
 
 ---
 
-### Gün 42 — Hafta 6 Özet
+### Gün 45 — Hafta 6 Özet ve Faz 2 Sonu
 
 **Tekrar soruları:**
 1. Stub ile Mock arasındaki fark nedir? Ne zaman hangisi kullanılır?
 2. `WebApplicationFactory` nasıl çalışır? In-process mi çalışır?
 3. In-memory database ile TestContainers arasında neden TestContainers daha güvenilir?
 4. Architecture test neden CI'da çalıştırılmalı?
-5. %100 test coverage hedeflenmeli mi? Neden?
+5. Repository Pattern olmadan CQRS handler'ı unit test edebilir misin?
 
 ---
 
@@ -825,9 +844,9 @@ Types.InAssembly(domainAssembly)
 
 ---
 
-## Hafta 6 — SOLID Prensipleri: Gerçek Uygulama
+## Hafta 7 — SOLID Prensipleri: Gerçek Uygulama
 
-### Gün 36 — Single Responsibility Principle (SRP)
+### Gün 46 — Single Responsibility Principle (SRP)
 
 **Teorik:**
 - SRP'nin gerçek tanımı: "A class should have only one reason to change"
@@ -839,7 +858,7 @@ Types.InAssembly(domainAssembly)
 
 ---
 
-### Gün 37 — Open/Closed Principle (OCP)
+### Gün 47 — Open/Closed Principle (OCP)
 
 **Teorik:**
 - "Open for extension, closed for modification"
@@ -850,7 +869,7 @@ Types.InAssembly(domainAssembly)
 
 ---
 
-### Gün 38 — Liskov Substitution ve Interface Segregation
+### Gün 48 — Liskov Substitution ve Interface Segregation
 
 **Teorik (LSP):**
 - "Subtype must be substitutable for base type"
@@ -866,7 +885,7 @@ Types.InAssembly(domainAssembly)
 
 ---
 
-### Gün 39 — Dependency Inversion Principle (DIP)
+### Gün 49 — Dependency Inversion Principle (DIP)
 
 **Teorik:**
 - "High-level modules should not depend on low-level modules"
@@ -877,7 +896,7 @@ Types.InAssembly(domainAssembly)
 
 ---
 
-### Gün 40 — SOLID Sentez: Mimari Etkileri
+### Gün 50 — SOLID Sentez: Mimari Etkileri
 
 **Teorik:**
 - SOLID ihlalleri teknik borca nasıl dönüşür?
@@ -887,7 +906,7 @@ Types.InAssembly(domainAssembly)
 
 ---
 
-### Gün 41 — GoF Design Patterns: Creational
+### Gün 51 — GoF Design Patterns: Creational
 
 **Teorik:**
 - Factory Method — nesne oluşturma kararını alt sınıfa bırak
@@ -915,7 +934,7 @@ Types.InAssembly(domainAssembly)
 
 ---
 
-### Gün 42 — Hafta 6 Özet
+### Gün 52 — Hafta 7 Özet
 
 **Mimari soru:**
 - Bir ödeme sistemi tasarlıyorsun. Kredi kartı, PayPal, crypto desteklenecek. SOLID'i nasıl uygularsın?
@@ -923,9 +942,9 @@ Types.InAssembly(domainAssembly)
 
 ---
 
-## Hafta 7 — GoF Design Patterns: Structural & Behavioral
+## Hafta 8 — GoF Design Patterns: Structural & Behavioral
 
-### Gün 43 — Structural Patterns
+### Gün 53 — Structural Patterns
 
 **Teorik:**
 - **Decorator** — davranış ekle, sınıfı değiştirme. ASP.NET Middleware bunun örneği
@@ -942,7 +961,7 @@ Types.InAssembly(domainAssembly)
 
 ---
 
-### Gün 44 — Behavioral Patterns 1
+### Gün 54 — Behavioral Patterns 1
 
 **Teorik:**
 - **Strategy** — algoritma ailesi, runtime seçimi
@@ -958,7 +977,7 @@ Types.InAssembly(domainAssembly)
 
 ---
 
-### Gün 45 — Behavioral Patterns 2
+### Gün 55 — Behavioral Patterns 2
 
 **Teorik:**
 - **Mediator** — nesneler arası iletişimi merkezi nesne üzerinden
@@ -973,7 +992,7 @@ Types.InAssembly(domainAssembly)
 
 ---
 
-### Gün 46 — Anti-Patterns: Kaçınılması Gerekenler
+### Gün 56 — Anti-Patterns: Kaçınılması Gerekenler
 
 **Teorik:**
 - Anemic Domain Model — sadece getter/setter, logic yok
@@ -987,7 +1006,7 @@ Types.InAssembly(domainAssembly)
 
 ---
 
-### Gün 47 — Domain-Driven Design: Taktiksel Kavramlar
+### Gün 57 — Domain-Driven Design: Taktiksel Kavramlar
 
 **Teorik:**
 - Entity vs Value Object farkı
@@ -1006,7 +1025,7 @@ Aggregate'ler arası tutarlılık → eventual consistency
 
 ---
 
-### Gün 48 — Hafta 7 Özet
+### Gün 58 — Hafta 8 Özet
 
 **Mimari soru:**
 - Sipariş durumu (Pending, Confirmed, Shipped, Delivered, Cancelled) State pattern ile nasıl modellenir?
@@ -1015,9 +1034,9 @@ Aggregate'ler arası tutarlılık → eventual consistency
 
 ---
 
-## Hafta 8 — Onion / Clean Architecture
+## Hafta 9 — Onion / Clean Architecture
 
-### Gün 49 — Layered Architecture'dan Onion'a Geçiş
+### Gün 59 — Layered Architecture'dan Onion'a Geçiş
 
 **Teorik:**
 - Traditional N-Layer: Presentation → Business → Data — sorun nedir?
@@ -1029,7 +1048,7 @@ Aggregate'ler arası tutarlılık → eventual consistency
 
 ---
 
-### Gün 50 — Onion Katmanları: Detaylı Analiz
+### Gün 60 — Onion Katmanları: Detaylı Analiz
 
 **Teorik:**
 
@@ -1060,7 +1079,7 @@ Aggregate'ler arası tutarlılık → eventual consistency
 
 ---
 
-### Gün 51 — Bağımlılık Kuralı: Dependency Rule
+### Gün 61 — Bağımlılık Kuralı: Dependency Rule
 
 **Teorik:**
 - "Bağımlılık daima içe doğru akar"
@@ -1076,7 +1095,7 @@ Aggregate'ler arası tutarlılık → eventual consistency
 
 ---
 
-### Gün 52 — CQRS: Command Query Responsibility Segregation
+### Gün 62 — CQRS: Command Query Responsibility Segregation
 
 **Teorik:**
 - CQRS nedir? Okuma ve yazma modellerini ayırma
@@ -1095,7 +1114,7 @@ Logging Behavior → Validation Behavior → Handler
 
 ---
 
-### Gün 53 — MediatR: Pipeline Behaviors
+### Gün 63 — MediatR: Pipeline Behaviors
 
 **Teorik:**
 - `IPipelineBehavior<TRequest, TResponse>` — AOP benzeri
@@ -1109,7 +1128,7 @@ Logging Behavior → Validation Behavior → Handler
 
 ---
 
-### Gün 54 — Result Pattern ve Hata Yönetimi
+### Gün 64 — Result Pattern ve Hata Yönetimi
 
 **Teorik:**
 - Exception vs Result pattern
@@ -1122,7 +1141,7 @@ Logging Behavior → Validation Behavior → Handler
 
 ---
 
-### Gün 55 — Hafta 8 Özet
+### Gün 65 — Hafta 9 Özet
 
 **Mimari soru:**
 - E-ticaret uygulamasında sipariş oluşturma use case'ini Onion Architecture'da nasıl tasarlarsın?
@@ -1131,9 +1150,9 @@ Logging Behavior → Validation Behavior → Handler
 
 ---
 
-## Hafta 9 — İleri Mimari Kavramlar
+## Hafta 10 — İleri Mimari Kavramlar
 
-### Gün 56 — Event-Driven Architecture Temelleri
+### Gün 66 — Event-Driven Architecture Temelleri
 
 **Teorik:**
 - Domain Event vs Integration Event farkı
@@ -1145,7 +1164,7 @@ Logging Behavior → Validation Behavior → Handler
 
 ---
 
-### Gün 57 — Specification Pattern
+### Gün 67 — Specification Pattern
 
 **Teorik:**
 - Business rule'u nesne olarak temsil et
@@ -1156,7 +1175,7 @@ Logging Behavior → Validation Behavior → Handler
 
 ---
 
-### Gün 58 — Unit of Work Pattern
+### Gün 68 — Unit of Work Pattern
 
 **Teorik:**
 - Unit of Work — transaction yönetimi
@@ -1167,7 +1186,7 @@ Logging Behavior → Validation Behavior → Handler
 
 ---
 
-### Gün 59 — Validation Stratejileri
+### Gün 69 — Validation Stratejileri
 
 **Teorik:**
 - DataAnnotations vs FluentValidation
@@ -1179,7 +1198,7 @@ Logging Behavior → Validation Behavior → Handler
 
 ---
 
-### Gün 59b — Vertical Slice Architecture
+### Gün 70 — Vertical Slice Architecture
 
 **Teorik:**
 - Vertical Slice nedir? Katman bazlı değil, özellik bazlı organizasyon
@@ -1197,7 +1216,7 @@ Logging Behavior → Validation Behavior → Handler
 
 ---
 
-### Gün 59c — Modüler Monolith Mimarisi
+### Gün 71 — Modüler Monolith Mimarisi
 
 **Teorik:**
 - Modüler Monolith nedir? Tek deployment, modül izolasyonu
@@ -1223,7 +1242,7 @@ Modüler Monolith tercih et:
 
 ---
 
-### Gün 60 — Hafta 9 Özet ve Faz 3 Kapanış
+### Gün 72 — Hafta 10 Özet ve Faz 3 Kapanış
 
 **Büyük mimari soru:**
 Bir e-ticaret platformu tasarla (kavramsal):
@@ -1253,9 +1272,9 @@ Bir e-ticaret platformu tasarla (kavramsal):
 
 ---
 
-## Hafta 10 — .NET Performans: Bellek ve Allocation
+## Hafta 11 — .NET Performans: Bellek ve Allocation
 
-### Gün 61 — Allocation Analizi: BenchmarkDotNet ve dotMemory
+### Gün 73 — Allocation Analizi: BenchmarkDotNet ve dotMemory
 
 **Teorik:**
 - Allocation neden kötü? GC baskısı
@@ -1266,7 +1285,7 @@ Bir e-ticaret platformu tasarla (kavramsal):
 
 ---
 
-### Gün 62 — Span<T>, Memory<T>, ArrayPool<T>
+### Gün 74 — Span<T>, Memory<T>, ArrayPool<T>
 
 **Teorik:**
 - `Span<T>` — stack-allocated, allocation-free slice
@@ -1278,7 +1297,7 @@ Bir e-ticaret platformu tasarla (kavramsal):
 
 ---
 
-### Gün 63 — Struct, readonly struct, ref struct
+### Gün 75 — Struct, readonly struct, ref struct
 
 **Teorik:**
 - Defensive copying nedir? readonly struct neden önler?
@@ -1289,7 +1308,7 @@ Bir e-ticaret platformu tasarla (kavramsal):
 
 ---
 
-### Gün 64 — String Optimizasyonları
+### Gün 76 — String Optimizasyonları
 
 **Teorik:**
 - `string.Concat` vs `StringBuilder` vs `string.Create()`
@@ -1300,7 +1319,7 @@ Bir e-ticaret platformu tasarla (kavramsal):
 
 ---
 
-### Gün 65 — Async Performans: ValueTask ve IAsyncEnumerable
+### Gün 77 — Async Performans: ValueTask ve IAsyncEnumerable
 
 **Teorik:**
 - `ValueTask<T>` — synchronous path'te allocation sıfır
@@ -1311,7 +1330,7 @@ Bir e-ticaret platformu tasarla (kavramsal):
 
 ---
 
-### Gün 66 — Memory Leak Tespiti ve Çözümü
+### Gün 78 — Memory Leak Tespiti ve Çözümü
 
 **Teorik:**
 - .NET'te memory leak senaryoları:
@@ -1326,7 +1345,7 @@ Bir e-ticaret platformu tasarla (kavramsal):
 
 ---
 
-### Gün 66b — Production Diagnostics: dotnet CLI Araçları
+### Gün 79 — Production Diagnostics: dotnet CLI Araçları
 
 **Teorik:**
 - Production'da sorun var ama debugger bağlayamazsın — ne yaparsın?
@@ -1360,7 +1379,7 @@ Bir e-ticaret platformu tasarla (kavramsal):
 
 ---
 
-### Gün 67b — System.IO Streams, Pipelines ve Networking
+### Gün 80 — System.IO Streams, Pipelines ve Networking
 
 > Node.js'teki Stream kavramlarının .NET karşılığı — aynı zihinsel model, farklı API.
 
@@ -1423,7 +1442,7 @@ Bir e-ticaret platformu tasarla (kavramsal):
 
 ---
 
-### Gün 67 — Hafta 10 Özet
+### Gün 81 — Hafta 11 Özet
 
 **Pratik görev:**
 - Bir CSV dosyasını satır satır oku, `Span<char>` ile parse et, nesne oluştur
@@ -1432,9 +1451,9 @@ Bir e-ticaret platformu tasarla (kavramsal):
 
 ---
 
-## Hafta 11 — Parallelism, Concurrency ve Thread Safety
+## Hafta 12 — Parallelism, Concurrency ve Thread Safety
 
-### Gün 68 — Thread Safety: Lock, Monitor, Interlocked
+### Gün 82 — Thread Safety: Lock, Monitor, Interlocked
 
 **Teorik:**
 - Race condition — ne zaman olur?
@@ -1446,7 +1465,7 @@ Bir e-ticaret platformu tasarla (kavramsal):
 
 ---
 
-### Gün 69 — Task Parallel Library (TPL) Derinlemesine
+### Gün 83 — Task Parallel Library (TPL) Derinlemesine
 
 **Teorik:**
 - `Parallel.For`, `Parallel.ForEach` — data parallelism
@@ -1458,7 +1477,7 @@ Bir e-ticaret platformu tasarla (kavramsal):
 
 ---
 
-### Gün 70 — Channel<T> ve Producer-Consumer
+### Gün 84 — Channel<T> ve Producer-Consumer
 
 **Teorik:**
 - `Channel<T>` — modern async queue
@@ -1470,7 +1489,7 @@ Bir e-ticaret platformu tasarla (kavramsal):
 
 ---
 
-### Gün 71 — Thread Pool ve Task Scheduling
+### Gün 85 — Thread Pool ve Task Scheduling
 
 **Teorik:**
 - ThreadPool neden `new Thread()` yerine tercih edilir?
@@ -1482,7 +1501,7 @@ Bir e-ticaret platformu tasarla (kavramsal):
 
 ---
 
-### Gün 72 — Immutability ve Functional Patterns
+### Gün 86 — Immutability ve Functional Patterns
 
 **Teorik:**
 - Immutable data neden thread-safe?
@@ -1493,7 +1512,7 @@ Bir e-ticaret platformu tasarla (kavramsal):
 
 ---
 
-### Gün 73 — Hafta 11 Özet
+### Gün 87 — Hafta 12 Özet
 
 **Senaryo sorusu:**
 - 10.000 URL'yi paralel fetch edeceksin. ThreadPool starvation olmadan nasıl yaparsın?
@@ -1502,9 +1521,9 @@ Bir e-ticaret platformu tasarla (kavramsal):
 
 ---
 
-## Hafta 12 — ASP.NET Core Performans Tuning
+## Hafta 13 — ASP.NET Core Performans Tuning
 
-### Gün 74 — Response Compression, Caching, CDN
+### Gün 88 — Response Compression, Caching, CDN
 
 **Teorik:**
 - Response compression — Brotli vs Gzip
@@ -1515,7 +1534,7 @@ Bir e-ticaret platformu tasarla (kavramsal):
 
 ---
 
-### Gün 75 — Rate Limiting
+### Gün 89 — Rate Limiting
 
 **Teorik:**
 - Rate limiting neden gerekli?
@@ -1526,7 +1545,7 @@ Bir e-ticaret platformu tasarla (kavramsal):
 
 ---
 
-### Gün 76 — Minimal API Performance
+### Gün 90 — Minimal API Performance
 
 **Teorik:**
 - Minimal API neden controller'dan daha hızlı?
@@ -1537,7 +1556,7 @@ Bir e-ticaret platformu tasarla (kavramsal):
 
 ---
 
-### Gün 77 — SQL ve Index Stratejisi: .NET Geliştiricisi Perspektifinden
+### Gün 91 — SQL ve Index Stratejisi: .NET Geliştiricisi Perspektifinden
 
 **Teorik:**
 - Index türleri: Clustered vs Non-Clustered index
@@ -1553,7 +1572,7 @@ Bir e-ticaret platformu tasarla (kavramsal):
 
 ---
 
-### Gün 77b — Redis: Distributed Cache Derinlemesine
+### Gün 92 — Redis: Distributed Cache Derinlemesine
 
 **Teorik:**
 - Redis veri yapıları: String, List, Set, Sorted Set, Hash, Stream
@@ -1575,7 +1594,7 @@ Redis      → multi-instance, restart'ta kalıcılık, session paylaşımı
 
 ---
 
-### Gün 78 — Health Checks ve Readiness/Liveness
+### Gün 93 — Health Checks ve Readiness/Liveness
 
 **Teorik:**
 - Kubernetes liveness vs readiness probe
@@ -1586,7 +1605,7 @@ Redis      → multi-instance, restart'ta kalıcılık, session paylaşımı
 
 ---
 
-### Gün 79 — Hafta 12 Özet
+### Gün 94 — Hafta 13 Özet
 
 **Performans checklist:**
 - [ ] `AsNoTracking()` kullanıldı mı?
@@ -1598,14 +1617,14 @@ Redis      → multi-instance, restart'ta kalıcılık, session paylaşımı
 
 ---
 
-## Hafta 13 — Niş Production Patterns: EF Core İleri
+## Hafta 15 — Niş Production Patterns: EF Core İleri
 
 > Bu haftada öğreneceğin konular "kod çalışıyor" ile "production'a hazır" arasındaki farkı oluşturur.
 > Her biri gerçek projelerde kaçınılmaz karşılaşacağın senaryolardır.
 
 ---
 
-### Gün 80 — Soft Delete ve Global Query Filters
+### Gün 95 — Soft Delete ve Global Query Filters
 
 **Teorik:**
 - Soft delete nedir? `IsDeleted` flag ile fiziksel silme yerine mantıksal silme
@@ -1622,7 +1641,7 @@ Redis      → multi-instance, restart'ta kalıcılık, session paylaşımı
 
 ---
 
-### Gün 81 — Audit Trail: Kim, Ne Zaman, Ne Yaptı?
+### Gün 96 — Audit Trail: Kim, Ne Zaman, Ne Yaptı?
 
 **Teorik:**
 - Audit trail neden gerekli? GDPR, finansal sistemler, debug
@@ -1636,7 +1655,7 @@ Redis      → multi-instance, restart'ta kalıcılık, session paylaşımı
 
 ---
 
-### Gün 82 — Optimistic Concurrency ve Conflict Resolution
+### Gün 97 — Optimistic Concurrency ve Conflict Resolution
 
 **Teorik:**
 - Optimistic concurrency nedir? "Son yazan kazanır" sorununu çözer
@@ -1652,7 +1671,7 @@ Redis      → multi-instance, restart'ta kalıcılık, session paylaşımı
 
 ---
 
-### Gün 83 — Multi-Tenancy Mimarisi
+### Gün 98 — Multi-Tenancy Mimarisi
 
 **Teorik:**
 - Multi-tenancy nedir? Tek uygulama, N farklı müşteri (tenant)
@@ -1670,7 +1689,7 @@ Redis      → multi-instance, restart'ta kalıcılık, session paylaşımı
 
 ---
 
-### Gün 84 — EF Core Interceptors ve SaveChanges Pipeline
+### Gün 99 — EF Core Interceptors ve SaveChanges Pipeline
 
 **Teorik:**
 - EF Core Interceptor türleri:
@@ -1686,11 +1705,11 @@ Redis      → multi-instance, restart'ta kalıcılık, session paylaşımı
 
 ---
 
-## Hafta 14 — Niş Production Patterns: API ve Loglama
+## Hafta 16 — Niş Production Patterns: API ve Loglama
 
 ---
 
-### Gün 85 — Idempotency: API ve Message Consumer
+### Gün 100 — Idempotency: API ve Message Consumer
 
 **Teorik:**
 - Idempotency nedir? Aynı işlemi N kez yapmak = 1 kez yapmak
@@ -1713,7 +1732,7 @@ Redis      → multi-instance, restart'ta kalıcılık, session paylaşımı
 
 ---
 
-### Gün 86 — Structured Logging: Production-Grade
+### Gün 101 — Structured Logging: Production-Grade
 
 **Teorik:**
 - Structured logging vs düz string logging — neden fark kritik?
@@ -1739,7 +1758,7 @@ Redis      → multi-instance, restart'ta kalıcılık, session paylaşımı
 
 ---
 
-### Gün 87 — Problem Details RFC 9457 ve API Hata Standartları
+### Gün 102 — Problem Details RFC 9457 ve API Hata Standartları
 
 **Teorik:**
 - RFC 7807 → RFC 9457 evrimi (Temmuz 2023) — `ProblemDetails` için yeni standart
@@ -1757,7 +1776,7 @@ Redis      → multi-instance, restart'ta kalıcılık, session paylaşımı
 
 ---
 
-### Gün 88 — Data Protection API ve Şifreleme Temelleri
+### Gün 103 — Data Protection API ve Şifreleme Temelleri
 
 **Teorik:**
 - .NET Data Protection API — ASP.NET Core'un built-in şifreleme sistemi
@@ -1773,7 +1792,7 @@ Redis      → multi-instance, restart'ta kalıcılık, session paylaşımı
 
 ---
 
-### Gün 89 — Domain Event Dispatch: Doğru Mimari
+### Gün 104 — Domain Event Dispatch: Doğru Mimari
 
 **Teorik:**
 - Domain event ne zaman dispatch edilmeli? `SaveChanges` öncesi mi, sonrası mı?
@@ -1788,7 +1807,7 @@ Redis      → multi-instance, restart'ta kalıcılık, session paylaşımı
 
 ---
 
-### Gün 90 — Feature Flags ve Dark Launching
+### Gün 105 — Feature Flags ve Dark Launching
 
 **Teorik:**
 - Feature flag nedir? Deploy ≠ Release ayrımı
@@ -1808,7 +1827,7 @@ Redis      → multi-instance, restart'ta kalıcılık, session paylaşımı
 
 ## Haftalar 15–16 — Advanced API: Security, gRPC, SignalR
 
-### Gün 91–95 — API Security Derinlemesine
+### Gün 106–110 — API Security Derinlemesine
 
 **Teorik:**
 - OAuth 2.0 grant types — Authorization Code, Client Credentials, PKCE
@@ -1823,7 +1842,7 @@ Redis      → multi-instance, restart'ta kalıcılık, session paylaşımı
 
 ---
 
-### Gün 95b — Identity Server, Keycloak ve OpenID Connect (Mikroservis Auth)
+### Gün 111 — Identity Server, Keycloak ve OpenID Connect (Mikroservis Auth)
 
 **Teorik:**
 - OpenID Connect nedir? OAuth 2.0 üzerine kimlik katmanı — `id_token` vs `access_token`
@@ -1856,7 +1875,7 @@ Redis      → multi-instance, restart'ta kalıcılık, session paylaşımı
 
 ---
 
-### Gün 96–98 — gRPC ve Protocol Buffers
+### Gün 112–114 — gRPC ve Protocol Buffers
 
 **Teorik:**
 - gRPC neden REST'ten farklı? Binary protocol, HTTP/2
@@ -1868,7 +1887,7 @@ Redis      → multi-instance, restart'ta kalıcılık, session paylaşımı
 
 ---
 
-### Gün 99–102 — SignalR: Real-Time İletişim
+### Gün 115–118 — SignalR: Real-Time İletişim
 
 **Teorik:**
 - SignalR — WebSocket abstraction
@@ -1896,9 +1915,9 @@ Redis      → multi-instance, restart'ta kalıcılık, session paylaşımı
 
 ---
 
-## Hafta 15 — Mikroservis Temelleri
+## Hafta 17 — Mikroservis Temelleri
 
-### Gün 92 — Monolith → Microservice: Ne Zaman?
+### Gün 119 — Monolith → Microservice: Ne Zaman?
 
 **Teorik:**
 - Monolith'in avantajları — basitlik, transaction, debugging
@@ -1910,7 +1929,7 @@ Redis      → multi-instance, restart'ta kalıcılık, session paylaşımı
 
 ---
 
-### Gün 93 — Bounded Context ve Servis Sınırları
+### Gün 120 — Bounded Context ve Servis Sınırları
 
 **Teorik:**
 - Bounded Context nedir? DDD strategic design
@@ -1922,7 +1941,7 @@ Redis      → multi-instance, restart'ta kalıcılık, session paylaşımı
 
 ---
 
-### Gün 94 — Servisler Arası İletişim
+### Gün 121 — Servisler Arası İletişim
 
 **Teorik:**
 - Synchronous: REST, gRPC
@@ -1934,7 +1953,7 @@ Redis      → multi-instance, restart'ta kalıcılık, session paylaşımı
 
 ---
 
-### Gün 95 — API Gateway
+### Gün 122 — API Gateway
 
 **Teorik:**
 - API Gateway pattern — tek giriş noktası
@@ -1946,7 +1965,7 @@ Redis      → multi-instance, restart'ta kalıcılık, session paylaşımı
 
 ---
 
-### Gün 96 — Service Discovery ve Load Balancing
+### Gün 123 — Service Discovery ve Load Balancing
 
 **Teorik:**
 - Service Discovery — DNS-based vs client-side vs server-side
@@ -1957,7 +1976,7 @@ Redis      → multi-instance, restart'ta kalıcılık, session paylaşımı
 
 ---
 
-### Gün 97 — Hafta 15 Özet
+### Gün 124 — Hafta 17 Özet
 
 **Mimari soru:**
 - 3 bounded context belirle, servis sınırlarını neden orada çizdiğini açıkla
@@ -1965,9 +1984,9 @@ Redis      → multi-instance, restart'ta kalıcılık, session paylaşımı
 
 ---
 
-## Hafta 16 — Message Broker'lar
+## Hafta 18 — Message Broker'lar
 
-### Gün 98 — RabbitMQ: Kavramsal Derinlik
+### Gün 125 — RabbitMQ: Kavramsal Derinlik
 
 **Teorik:**
 - AMQP protokolü
@@ -1981,7 +2000,7 @@ Redis      → multi-instance, restart'ta kalıcılık, session paylaşımı
 
 ---
 
-### Gün 99 — Apache Kafka: Log-Based Messaging
+### Gün 126 — Apache Kafka: Log-Based Messaging
 
 **Teorik:**
 - Kafka vs RabbitMQ — temel fark: log vs queue
@@ -1994,7 +2013,7 @@ Redis      → multi-instance, restart'ta kalıcılık, session paylaşımı
 
 ---
 
-### Gün 100 — Outbox Pattern: At-Least-Once Delivery
+### Gün 127 — Outbox Pattern: At-Least-Once Delivery
 
 **Teorik:**
 - Problem: DB kaydet + mesaj gönder — ikisi atomik değil
@@ -2006,7 +2025,7 @@ Redis      → multi-instance, restart'ta kalıcılık, session paylaşımı
 
 ---
 
-### Gün 101 — Saga Pattern: Distributed Transaction
+### Gün 128 — Saga Pattern: Distributed Transaction
 
 **Teorik:**
 - 2-Phase Commit neden mikroserviste çalışmaz?
@@ -2019,7 +2038,7 @@ Redis      → multi-instance, restart'ta kalıcılık, session paylaşımı
 
 ---
 
-### Gün 102 — Hafta 16 Özet
+### Gün 129 — Hafta 18 Özet
 
 **Senaryo:**
 - Sipariş oluştur → ödeme al → kargo hazırla → bildirim gönder
@@ -2028,9 +2047,9 @@ Redis      → multi-instance, restart'ta kalıcılık, session paylaşımı
 
 ---
 
-## Hafta 17 — Resilience ve Fault Tolerance
+## Hafta 19 — Resilience ve Fault Tolerance
 
-### Gün 103 — Circuit Breaker Pattern
+### Gün 130 — Circuit Breaker Pattern
 
 **Teorik:**
 - Cascade failure — bir servisin düşmesi zincirleme etkisi
@@ -2042,7 +2061,7 @@ Redis      → multi-instance, restart'ta kalıcılık, session paylaşımı
 
 ---
 
-### Gün 104 — Retry ve Timeout Stratejileri
+### Gün 131 — Retry ve Timeout Stratejileri
 
 **Teorik:**
 - Retry — idempotent endpoint'lerde güvenli
@@ -2054,7 +2073,7 @@ Redis      → multi-instance, restart'ta kalıcılık, session paylaşımı
 
 ---
 
-### Gün 105 — Bulkhead Pattern
+### Gün 132 — Bulkhead Pattern
 
 **Teorik:**
 - Bulkhead — bir servisin tüm thread'i tüketmesini önle
@@ -2065,7 +2084,7 @@ Redis      → multi-instance, restart'ta kalıcılık, session paylaşımı
 
 ---
 
-### Gün 106 — Fallback ve Graceful Degradation
+### Gün 133 — Fallback ve Graceful Degradation
 
 **Teorik:**
 - Fallback — servis düştüğünde ne sunulur?
@@ -2076,7 +2095,7 @@ Redis      → multi-instance, restart'ta kalıcılık, session paylaşımı
 
 ---
 
-### Gün 107 — Hafta 17 Özet
+### Gün 134 — Hafta 19 Özet
 
 **Resilience tasarımı:**
 - `HttpClient` için Polly pipeline tasarla (retry 3x, circuit breaker, timeout 5s)
@@ -2084,9 +2103,9 @@ Redis      → multi-instance, restart'ta kalıcılık, session paylaşımı
 
 ---
 
-## Hafta 18 — Distributed Systems: İleri Kavramlar
+## Hafta 20 — Distributed Systems: İleri Kavramlar
 
-### Gün 108 — CAP Teoremi ve Consistency Modelleri
+### Gün 135 — CAP Teoremi ve Consistency Modelleri
 
 **Teorik:**
 - CAP teoremi — Consistency, Availability, Partition Tolerance
@@ -2098,7 +2117,7 @@ Redis      → multi-instance, restart'ta kalıcılık, session paylaşımı
 
 ---
 
-### Gün 109 — Distributed Tracing ve Observability: Derinlemesine
+### Gün 136 — Distributed Tracing ve Observability: Derinlemesine
 
 **Teorik:**
 - Three pillars of observability: Logs, Metrics, Traces
@@ -2134,7 +2153,7 @@ Metrik  → ne sıklıkta, ne kadar (ölçüm)
 
 ---
 
-### Gün 110 — Event Sourcing
+### Gün 137 — Event Sourcing
 
 **Teorik:**
 - Event Sourcing nedir? State yerine event'leri sakla
@@ -2147,7 +2166,7 @@ Metrik  → ne sıklıkta, ne kadar (ölçüm)
 
 ---
 
-### Gün 111 — Idempotency ve Message Deduplication
+### Gün 138 — Idempotency ve Message Deduplication
 
 **Teorik:**
 - At-most-once vs At-least-once vs Exactly-once
@@ -2158,7 +2177,7 @@ Metrik  → ne sıklıkta, ne kadar (ölçüm)
 
 ---
 
-### Gün 112 — Data Consistency Patterns
+### Gün 139 — Data Consistency Patterns
 
 **Teorik:**
 - Database per Service — data isolation
@@ -2169,7 +2188,7 @@ Metrik  → ne sıklıkta, ne kadar (ölçüm)
 
 ---
 
-### Gün 113 — Hafta 18 Özet
+### Gün 140 — Hafta 20 Özet
 
 **Büyük mimari soru:**
 - Event Sourcing mi yoksa CRUD + Domain Events mi? Ne zaman hangisi?
@@ -2178,13 +2197,13 @@ Metrik  → ne sıklıkta, ne kadar (ölçüm)
 
 ---
 
-## Hafta 18b — .NET Aspire: Cloud-Native Geliştirme
+## Hafta 21 — .NET Aspire: Cloud-Native Geliştirme
 
 > .NET Aspire, 2024-2025'te ortaya çıkan ve 2026'da mikroservis geliştirmenin standart yolu haline gelen framework. Mikroservisler bölümünün son halkası.
 
 ---
 
-### Gün 114 — .NET Aspire Nedir? Neden Önemli?
+### Gün 141 — .NET Aspire Nedir? Neden Önemli?
 
 **Teorik:**
 - .NET Aspire — opinionated, cloud-native, distributed app framework
@@ -2201,7 +2220,7 @@ Metrik  → ne sıklıkta, ne kadar (ölçüm)
 
 ---
 
-### Gün 115 — Aspire AppHost ve Komponent Modeli
+### Gün 142 — Aspire AppHost ve Komponent Modeli
 
 **Teorik:**
 - `IDistributedApplicationBuilder` — kaynak (resource) tanımlama
@@ -2216,7 +2235,7 @@ Metrik  → ne sıklıkta, ne kadar (ölçüm)
 
 ---
 
-### Gün 116 — Aspire ile Mikroservis Geliştirme Akışı
+### Gün 143 — Aspire ile Mikroservis Geliştirme Akışı
 
 **Teorik:**
 - Aspire olmadan vs Aspire ile geliştirme deneyimi karşılaştırması
@@ -2236,7 +2255,7 @@ Aspire         → .NET ekosistemi, OTel dashboard, tip-güvenli config, Azure-f
 
 ## Haftalar 20–21 — Containerization ve Kubernetes
 
-### Gün 114–117 — Docker: .NET Servisleri
+### Gün 144–147 — Docker: .NET Servisleri
 
 **Teorik:**
 - Container vs VM — namespace ve cgroup izolasyonu
@@ -2250,7 +2269,7 @@ Aspire         → .NET ekosistemi, OTel dashboard, tip-güvenli config, Azure-f
 
 ---
 
-### Gün 118–122 — Kubernetes: .NET Servisleri için
+### Gün 148–152 — Kubernetes: .NET Servisleri için
 
 **Teorik:**
 - Pod, ReplicaSet, Deployment
@@ -2266,7 +2285,7 @@ Aspire         → .NET ekosistemi, OTel dashboard, tip-güvenli config, Azure-f
 
 ## Haftalar 21–22 — CI/CD, Güvenlik ve Final Proje
 
-### Gün 123–127 — CI/CD Pipeline
+### Gün 153–157 — CI/CD Pipeline
 
 **Teorik:**
 - GitHub Actions ile .NET CI/CD
@@ -2278,7 +2297,7 @@ Aspire         → .NET ekosistemi, OTel dashboard, tip-güvenli config, Azure-f
 
 ---
 
-### Gün 128–132 — Güvenlik: Production Checklist
+### Gün 158–162 — Güvenlik: Production Checklist
 
 **Teorik:**
 - Secret management — Azure Key Vault, HashiCorp Vault
@@ -2291,7 +2310,7 @@ Aspire         → .NET ekosistemi, OTel dashboard, tip-güvenli config, Azure-f
 
 ---
 
-### Gün 133–140 — Final Proje: Mini E-Ticaret Mikroservis Mimarisi
+### Gün 163–170 — Final Proje: Mini E-Ticaret Mikroservis Mimarisi
 
 **Kavramsal tasarım görevi (kod değil, mimari):**
 

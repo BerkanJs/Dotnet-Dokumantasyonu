@@ -29,6 +29,21 @@
 
     <!-- Integration test: SQL Server yerine InMemory DB -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.4" />
+
+    <!-- Architecture test: namespace ve bağımlılık kuralları -->
+    <PackageReference Include="NetArchTest.Rules" Version="1.3.2" />
+
+    <!-- Integration test: gerçek SQL Server Docker container ile -->
+    <PackageReference Include="Testcontainers.MsSql" Version="3.9.0" />
+
+    <!-- TestContainers için gerçek SQL Server EF Core provider -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="9.0.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Infrastructure\appsettings.Testing.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
   <ItemGroup>

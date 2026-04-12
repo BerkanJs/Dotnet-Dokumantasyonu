@@ -1,0 +1,22 @@
+# Gün 37: Docker build context'e gönderilmeyen dosyalar.
+# Her "docker build" çağrısında tüm dizin build context olarak gönderilir.
+# Büyük/gereksiz dosyaları hariç tutmak build'i hızlandırır.
+
+**/bin/
+**/obj/
+**/.vs/
+**/*.user
+
+# Geliştirme log dosyaları
+Logs/
+
+# Geliştirme ortamı bağlantı dizesi — container'a girmesin
+# Production bağlantısı docker-compose environment variable ile verilir
+appsettings.Development.json
+
+# Git geçmişi ve metadata
+.git/
+.gitignore
+
+# Dokümantasyon
+*.md

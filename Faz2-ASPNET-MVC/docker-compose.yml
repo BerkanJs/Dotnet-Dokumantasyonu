@@ -1,0 +1,51 @@
+services:
+
+  # ─── SQL Server ──────────────────────────────────────────────────────────────
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      SA_PASSWORD:  "Guclu_Sifre_123!"   # prod'da Docker Secret kullan
+      ACCEPT_EULA:  "Y"                   # lisans kabulü — bu olmadan container başlamaz
+      MSSQL_PID:    "Express"             # Express: ücretsiz, 10GB limit
+    ports:
+      - "1433:1433"   # host:container — SSMS ile local bağlanmak için
+    volumes:
+      - sqlserver_data:/var/opt/mssql    # kalıcı depolama: container silinse de veri durur
+                                          # volumes yazmasaydık: container silinince DB tamamen kaybolur
+    healthcheck:
+      test: >
+        /opt/mssql-tools18/bin/sqlcmd
+        -S localhost -U sa -P "Guclu_Sifre_123!"
+        -Q "SELECT 1" -No
+      interval: 10s
+      retries:  10
+      start_period: 30s
+      # healthcheck: web servisi DB hazır olmadan başlamasın
+      # start_period: SQL Server'ın ilk açılışta ~20sn sürdüğü dikkate alınır
+
+  # ─── ASP.NET MVC Uygulama ────────────────────────────────────────────────────
+  web:
+    build:
+      context:    KitabeviMVC     # build context: KitabeviMVC klasörü
+      dockerfile: Dockerfile       # Dockerfile bu klasörde
+    ports:
+      - "8080:8080"   # tarayıcıda localhost:8080 → container'ın 8080'i
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Production"
+      ASPNETCORE_URLS:         "http://+:8080"
+      # Bağlantı dizesi environment variable ile verilir — kod içinde yok
+      # __ (çift alt tire): JSON hiyerarşisi → ConnectionStrings:DefaultConnection
+      ConnectionStrings__DefaultConnection: >-
+        Server=sqlserver,1433;
+        Database=KitabeviDb;
+        User Id=sa;
+        Password=Guclu_Sifre_123!;
+        TrustServerCertificate=True
+    depends_on:
+      sqlserver:
+        condition: service_healthy   # SQL Server healthcheck geçene kadar web başlamaz
+                                     # condition: service_started yazsaydık: DB henüz hazır değil → bağlantı hatası
+
+# Named volumes — docker tarafından yönetilen kalıcı depolama
+volumes:
+  sqlserver_data:

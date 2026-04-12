@@ -2,8 +2,12 @@ using Asp.Versioning;
 using Hangfire;
 using KitabeviMVC.Authorization;
 using KitabeviMVC.BackgroundServices;
+using KitabeviMVC.Behaviours;
 using KitabeviMVC.Endpoints;
+using KitabeviMVC.Repositories;
+using MediatR;
 using Scalar.AspNetCore;
+using Serilog;
 using KitabeviMVC.Configuration;
 using KitabeviMVC.Data;
 using KitabeviMVC.Filters;
@@ -14,7 +18,35 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 
+// ─────────────────────────────────────────────────────────────────────
+// Gün 36: Serilog — uygulama başlamadan önce yapılandırılır.
+// Startup sırasında oluşan hataları da yakalamak için builder'dan önce tanımlanır.
+// ─────────────────────────────────────────────────────────────────────
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Information()
+    // Override: Microsoft/EF Core namespace'ini Warning'e çek
+    // Override yazmasaydık: EF Core her SQL sorgusunu Information olarak loglar → log gürültüsü
+    .MinimumLevel.Override("Microsoft",                        Serilog.Events.LogEventLevel.Warning)
+    .MinimumLevel.Override("Microsoft.EntityFrameworkCore",    Serilog.Events.LogEventLevel.Warning)
+    .Enrich.FromLogContext()        // LogContext.PushProperty() ile anlık özellik eklemeye izin ver
+    .WriteTo.Console(outputTemplate:
+        "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
+    .WriteTo.File(
+        path:            "Logs/log-.txt",
+        rollingInterval: RollingInterval.Day,       // her gün yeni dosya
+        retainedFileCountLimit: 7,                  // 7 günden eski dosyalar silinir
+        outputTemplate:  "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
+    // sadece Console kullansaydık: uygulama kapanınca loglar kaybolur
+    .CreateLogger();
+
 var builder = WebApplication.CreateBuilder(args);
+
+// ─────────────────────────────────────────────────────────────────────
+// Gün 36: ASP.NET Core'un ILogger'ını Serilog ile değiştir.
+// bunu yazmasaydık: appsettings.json Logging bölümü kullanılırdı ve
+// yapılandırılmış loglama (structured logging) devre dışı kalırdı.
+// ─────────────────────────────────────────────────────────────────────
+builder.Host.UseSerilog();
 
 // ─────────────────────────────────────────────────────────────────────
 // Gün 19: Global Filter kayıtları
@@ -161,13 +193,16 @@ builder.Services.AddScoped<IAuthorizationHandler, KitapDuzenlemeHandler>();
 
 // ─────────────────────────────────────────────────────────────────────
 // Gün 29: DbContext kaydı.
-//
-// Geliştirme & öğrenme: UseInMemoryDatabase → SQL Server gerekmez.
-// Production'da değiştirmek için sadece bu bloğu güncelle:
-//   options.UseSqlServer(builder.Configuration.GetConnectionString("Default"))
+// Gün 32: SQL Server geçiş yolu gösterildi — şimdilik InMemory devam ediyor.
 //
 // AddDbContext → varsayılan olarak SCOPED kaydeder.
 // Her HTTP request için yeni DbContext → Unit of Work pattern.
+//
+// InMemory → SQL Server geçişi için bu bloğu değiştir:
+//   options.UseSqlServer(
+//       builder.Configuration.GetConnectionString("DefaultConnection"))
+//   ardından: dotnet ef migrations add InitialCreate
+//             dotnet ef database update
 // ─────────────────────────────────────────────────────────────────────
 builder.Services.AddDbContext<KitabeviDbContext>(options =>
     options.UseInMemoryDatabase("KitabeviDb"));
@@ -217,11 +252,57 @@ builder.Services.AddMemoryCache(options =>
 //   builder.Services.AddScoped<IKitapServisi, EfKitapServisi>();
 // ─────────────────────────────────────────────────────────────────────
 builder.Services.AddScoped<EfKitapServisi>();
+// Gün 32: DbSeeder — Scoped: DbContext Scoped olduğu için zorunlu.
+// Singleton yapılsaydı: "cannot consume scoped service from singleton" hatası.
+builder.Services.AddScoped<DbSeeder>();
 builder.Services.AddScoped<IKitapServisi>(sp =>
     new CachedKitapServisi(
         sp.GetRequiredService<EfKitapServisi>(),
         sp.GetRequiredService<IMemoryCache>(),
         sp.GetRequiredService<ILogger<CachedKitapServisi>>()));
+
+// ─────────────────────────────────────────────────────────────────────
+// Gün 30: IKitapSorguServisi — EfKitapServisi zaten implement ediyor.
+// Aynı Scoped instance üzerinden çözümlenir.
+// ─────────────────────────────────────────────────────────────────────
+builder.Services.AddScoped<IKitapSorguServisi>(sp =>
+    sp.GetRequiredService<EfKitapServisi>());
+
+// ─────────────────────────────────────────────────────────────────────
+// Gün 33: IKitapBatchServisi — ExecuteUpdate/Delete için ayrı interface.
+// EfKitapServisi zaten implement ediyor; aynı Scoped instance.
+//
+// Neden ayrı interface? CachedKitapServisi ve KitapServisi bu metodları
+// implement etmek zorunda değil — Interface Segregation Principle.
+// Controller IKitapBatchServisi'ni inject edince doğrudan EfKitapServisi'ne gider.
+// ─────────────────────────────────────────────────────────────────────
+builder.Services.AddScoped<IKitapBatchServisi>(sp =>
+    sp.GetRequiredService<EfKitapServisi>());
+// bunu yazmadan IKitapBatchServisi inject etmeye kalksaydık:
+// "No service for type 'IKitapBatchServisi' has been registered" → runtime exception
+
+// ─────────────────────────────────────────────────────────────────────
+// Gün 34: Unit of Work — Repository katmanı DI kaydı.
+// Scoped: her HTTP request için bir instance.
+// Transient yapmak: her inject noktasında yeni UoW → yeni context → transaction paylaşımı bozulur.
+// Singleton yapmak: tüm request'ler aynı context → thread-safety sorunu.
+// ─────────────────────────────────────────────────────────────────────
+builder.Services.AddScoped<IUnitOfWork, EfUnitOfWork>();
+
+// ─────────────────────────────────────────────────────────────────────
+// Gün 35: MediatR — handler'ları ve pipeline behaviour'ları kaydet.
+// RegisterServicesFromAssembly: aynı projede IRequestHandler implement eden
+// tüm sınıfları tarar ve DI'a kaydeder.
+// bunu yazmasaydık: handler'lar DI'a kayıtlı olmaz,
+// _mediator.Send() "handler bulunamadı" exception fırlatırdı.
+// ─────────────────────────────────────────────────────────────────────
+builder.Services.AddMediatR(cfg =>
+{
+    cfg.RegisterServicesFromAssembly(typeof(Program).Assembly);
+    // Pipeline behaviour: her Send() çağrısında LoggingBehaviour otomatik devreye girer
+    // Sıra önemli: birden fazla behaviour varsa kayıt sırası = pipeline sırası
+    cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(LoggingBehaviour<,>));
+});
 
 // TokenServisi — IOptions<T> kullanır (ayarlar uygulama boyunca sabit)
 builder.Services.AddSingleton<TokenServisi>();
@@ -236,28 +317,51 @@ builder.Services.AddScoped<TokenServisiScoped>();
 var app = builder.Build();
 
 // ─────────────────────────────────────────────────────────────────────
-// Gün 29: InMemory DB seed — uygulama başlayınca başlangıç verilerini ekle.
+// Gün 32: DbSeeder ile seed — inline seed yerine servis kullanılıyor.
 //
-// HasData() InMemory provider'da çalışmaz (migration tabanlı).
-// Çözüm: uygulama başlarken scope açıp DbContext'e doğrudan ver.
+// Gün 29'da inline yazılan seed bloğu buradan kaldırıldı.
+// Neden? Inline seed:
+//   → Yazarlar + Kitaplar sırası yönetilemez (FK bağımlılığı)
+//   → AnyAsync idempotency kontrolü yoktu → her uygulama restart'ta patlardı
+//   → YazarId set edilmiyordu → Gün 31 eager loading örneği boş kalırdı
 //
-// Production'da: Database.Migrate() + Seeder servisi kullanılır.
+// Pending migration kontrolü (SQL Server'a geçilince aktif olur):
+//   InMemory provider GetPendingMigrations() desteklemez → sadece SQL Server için.
+//   Bu yüzden kontrol şimdi yorum satırı; SQL Server'a geçince açılır.
+//
+// using: scope ömrü bu blokla sınırlı → DbContext burada dispose edilir.
+// bunu yazmadan GetRequiredService çağırsaydık scope hiç kapanmazdı → bellek sızıntısı.
 // ─────────────────────────────────────────────────────────────────────
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<KitabeviDbContext>();
 
-    if (!db.Kitaplar.Any())
-    {
-        db.Kitaplar.AddRange(
-            new KitabeviMVC.Models.Entities.Kitap { Id = 1, Baslik = "Clean Code",          Yazar = "Robert Martin", Fiyat = 45m,  Kategori = "Yazılım",  StokAdedi = 10, EklemeTarihi = DateTime.UtcNow },
-            new KitabeviMVC.Models.Entities.Kitap { Id = 2, Baslik = "DDD",                 Yazar = "Eric Evans",    Fiyat = 85m,  Kategori = "Mimari",   StokAdedi = 5,  EklemeTarihi = DateTime.UtcNow },
-            new KitabeviMVC.Models.Entities.Kitap { Id = 3, Baslik = "The Pragmatic Prog",  Yazar = "Hunt & Thomas", Fiyat = 55m,  Kategori = "Yazılım",  StokAdedi = 8,  EklemeTarihi = DateTime.UtcNow },
-            new KitabeviMVC.Models.Entities.Kitap { Id = 4, Baslik = "Suç ve Ceza",         Yazar = "Dostoyevski",   Fiyat = 89m,  Kategori = "Roman",    StokAdedi = 12, EklemeTarihi = DateTime.UtcNow },
-            new KitabeviMVC.Models.Entities.Kitap { Id = 5, Baslik = "Sapiens",             Yazar = "Harari",        Fiyat = 140m, Kategori = "Tarih",    StokAdedi = 20, EklemeTarihi = DateTime.UtcNow }
-        );
-        db.SaveChanges();
-    }
+    // ── SQL Server'a geçince bu bloğu aç ──────────────────────────────
+    // var bekleyenler = db.Database.GetPendingMigrations().ToList();
+    // if (bekleyenler.Any())
+    // {
+    //     var log = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    //     if (app.Environment.IsDevelopment())
+    //     {
+    //         // Geliştirme: otomatik uygula
+    //         log.LogInformation("Migration uygulanıyor: {Liste}", string.Join(", ", bekleyenler));
+    //         db.Database.Migrate();
+    //     }
+    //     else
+    //     {
+    //         // Production: uygulamayı başlatma — CI/CD migration bundle kullanılmalı
+    //         log.LogCritical("Production'da uygulanmamış migration var: {Liste}", string.Join(", ", bekleyenler));
+    //         throw new InvalidOperationException("Production'da migration bekleniyor, uygulama başlatılmıyor.");
+    //     }
+    // }
+    // ─────────────────────────────────────────────────────────────────
+
+    // DbSeeder: Yazarları önce, Kitapları sonra ekler (FK sırası)
+    // AnyAsync kontrolüyle idempotent → kaç kez çalışırsa çalışsın, duplicate yok
+    var seeder = scope.ServiceProvider.GetRequiredService<DbSeeder>();
+    await seeder.SeedAsync();
+    // bunu async çağırmak için Program.cs'in top-level statement'ı async olmalı
+    // .NET 6+ top-level statements zaten async'i destekler — await burada geçerli
 }
 
 // ──────────────────────────────────────────────
@@ -291,6 +395,23 @@ if (!app.Environment.IsDevelopment())
 
 // 2. İstek loglama — her isteği loglar (Gün 15)
 app.UseIstekLoglama();
+
+// ─────────────────────────────────────────────────────────────────────
+// Gün 36: Serilog request loglama — her HTTP isteği için otomatik log.
+// {RequestMethod} GET, {RequestPath} /kitaplar, {StatusCode} 200, {Elapsed} 12.3ms
+// UseRouting'den önce koyulursa routing süresi de dahil olur.
+// bunu yazmasaydık: istek/yanıt loglarını her action'a elle yazmak gerekir.
+// ─────────────────────────────────────────────────────────────────────
+app.UseSerilogRequestLogging(options =>
+{
+    options.MessageTemplate = "{RequestMethod} {RequestPath} → {StatusCode} ({Elapsed:0.0}ms)";
+    options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
+    {
+        diagnosticContext.Set("UserId",    httpContext.User.Identity?.Name ?? "anonim");
+        diagnosticContext.Set("UserAgent", httpContext.Request.Headers.UserAgent.ToString());
+        // bunu yazmasaydık: hangi kullanıcı hangi endpointi çağırdı bilemezdik
+    };
+});
 
 // 3. HTTP → HTTPS yönlendirme
 app.UseHttpsRedirection();
