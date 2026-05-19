@@ -85,60 +85,243 @@ new Kitap(1)   == new Kitap(1)    // → false (farklı nesne, aynı Id)
 
 ### Ne?
 
-**Aggregate:** Birlikte tutarlı olması gereken entity + value object grubu.
+**Aggregate:** Birlikte tutarlı olması gereken entity + value object grubu.  
+**Aggregate Root:** O gruba tek giriş noktası. Dışarıdan alt entity'lere direkt erişilmez — root üzerinden geçilir.
 
-**Aggregate Root:** Gruba tek giriş noktası. Dışarıdan sadece root'a erişilir, alt entity'lere direkt erişilmez.
+### Günlük hayat analogu
 
-### Günlük hayat analojisi
+Alışveriş sepeti düşün. Sepete ürün eklersin, çıkarırsın, miktarı değiştirirsin. Ama şu kurallar var:
 
-Bir banka hesabı düşün. Hesap sahibi, bakiye, işlem geçmişi birlikte bir aggregate. Dışarıdan doğrudan "işlem geçmişine kayıt ekle" diyemezsin — "hesaba para yatır" diyorsun, hesap kendi geçmişini güncelliyor. Hesap aggregate root.
+- Aynı kitabı iki kez ekleyemezsin — miktar artar
+- Boş sepeti ödemeye gönderemezsin
+- Bir kitaptan maksimum 5 adet eklenebilir
 
-### Faz2'deki durum
+Bu kurallar **sepetin kuralları** — her ürün kaleminin değil. Kim yönetmeli? Sepet yönetmeli.
 
-Faz2'de Aggregate kavramı yoktu — `Kitap` entity'si tek başınaydı. `Siparis` domain modeli hiç yazılmadı. Onion bölümünde yazacağız.
+---
 
-### Büyük projede böyle yapmalısın
+### Önce sorun: kural yok, her şey public
 
 ```csharp
-// Siparis.cs
-public class Siparis  // Aggregate Root
+// ❌ Aggregate yok — Sepet sadece liste tutan çanta
+public class Sepet
 {
-    public int Id { get; }
-    public SiparisDurumu Durum { get; private set; }
+    public int Id { get; set; }
+    public string KullaniciId { get; set; }
+    public List<SepetKalemi> Kalemler { get; set; } = new();
+    // List<> public → dışarıdan serbestçe .Add() / .Remove() yapılabiliyor
+}
 
-    private readonly List<SiparisKalemi> _kalemler = [];
-    public IReadOnlyList<SiparisKalemi> Kalemler => _kalemler;
-    // IReadOnlyList: dışarıdan Add/Remove yapılamaz
-    // bunu yazmasaydık → herkes _kalemler.Add() çağırabilirdi → tutarlılık bozulurdu
+public class SepetKalemi
+{
+    public int KitapId { get; set; }
+    public string KitapBaslik { get; set; }
+    public int Adet { get; set; }         // public set → dışarıdan -99 yazılabilir
+    public decimal BirimFiyat { get; set; }
+}
+```
 
-    public void KalemEkle(int kitapId, string baslik, Fiyat fiyat, int adet)
+Bu yapıyla şunları önleyemiyorsun:
+
+```csharp
+var sepet = await _sepetRepo.GetByIdAsync(kullaniciId);
+
+// Aynı kitabı iki kez ekle — Liste buna izin veriyor
+sepet.Kalemler.Add(new SepetKalemi { KitapId = 3, Adet = 1, BirimFiyat = 150 });
+sepet.Kalemler.Add(new SepetKalemi { KitapId = 3, Adet = 1, BirimFiyat = 150 });
+// Şimdi sepette KitapId=3 iki kez var — tutarsız
+
+// Adeti negatif yap
+sepet.Kalemler[0].Adet = -5;
+// Çalışır — hiçbir şey engellemez
+
+// Boş sepeti ödemeye gönder
+await _odemeServisi.OdemeAl(sepet);
+// Kaç TL? Kalem yok — 0 TL ödeme mi yapacağız?
+```
+
+Kural yazmak için her servise aynı if'i koyuyorsun:
+
+```csharp
+// SepetServisi
+if (sepet.Kalemler.Any(k => k.KitapId == kitapId))  // aynı kitap var mı?
+    sepet.Kalemler.First(k => k.KitapId == kitapId).Adet++;
+else
+    sepet.Kalemler.Add(...);
+
+// MobilApiSepetServisi — aynı kontrol kopyalandı
+if (sepet.Kalemler.Any(k => k.KitapId == kitapId))  // kopya
+    sepet.Kalemler.First(k => k.KitapId == kitapId).Adet++;
+else
+    sepet.Kalemler.Add(...);
+```
+
+Birini unutursan sepette aynı kitaptan iki satır oluyor — ödeme tutarsız hesaplanıyor.
+
+---
+
+### Çözüm: Sepet Aggregate Root
+
+```csharp
+// ✅ Sepet — Aggregate Root
+public class Sepet
+{
+    public int Id { get; private set; }
+    public string KullaniciId { get; private set; }
+
+    private readonly List<SepetKalemi> _kalemler = [];
+    public IReadOnlyList<SepetKalemi> Kalemler => _kalemler;
+    //     ↑ IReadOnlyList: dışarıdan .Add() / .Remove() çağrılamaz
+    //       bunu yazmasaydık → herkes sepet.Kalemler.Add() yapabilirdi, kural devre dışı
+
+    public Sepet(string kullaniciId)
     {
-        if (Durum != SiparisDurumu.Bekliyor)
-            throw new InvalidOperationException("Onaylanmış siparişe kalem eklenemez");
-        // invariant: iş kuralı aggregate içinde korunuyor
-        // bunu yazmasaydık → onaylı siparişe kalem eklenebilirdi
-        _kalemler.Add(new SiparisKalemi(kitapId, baslik, fiyat, adet));
+        KullaniciId = kullaniciId;
     }
 
-    public void Onayla()
+    public void UrunEkle(int kitapId, string kitapBaslik, Fiyat birimFiyat, int adet)
+    {
+        if (adet <= 0)
+            throw new ArgumentException("Adet sıfırdan büyük olmalı");
+
+        if (adet > 5)
+            throw new InvalidOperationException("Bir üründen en fazla 5 adet eklenebilir");
+        //  ↑ iş kuralı burada — SepetServisi if yazmadı
+
+        var mevcutKalem = _kalemler.FirstOrDefault(k => k.KitapId == kitapId);
+
+        if (mevcutKalem is not null)
+        {
+            mevcutKalem.AdetArtir(adet);
+            //          ↑ aynı kitap var → miktar artar, yeni satır açılmaz
+            //            bu kural burada — her servis ayrı yazmak zorunda değil
+        }
+        else
+        {
+            _kalemler.Add(new SepetKalemi(kitapId, kitapBaslik, birimFiyat, adet));
+            //          ↑ private listeye ekleme sadece bu metod üzerinden
+        }
+    }
+
+    public void UrunCikar(int kitapId)
+    {
+        var kalem = _kalemler.FirstOrDefault(k => k.KitapId == kitapId);
+
+        if (kalem is null)
+            throw new InvalidOperationException("Sepette böyle bir ürün yok");
+        //  ↑ olmayan ürünü çıkarmaya çalışınca burada patlar — servis kontrol etmek zorunda değil
+
+        _kalemler.Remove(kalem);
+    }
+
+    public void Temizle() => _kalemler.Clear();
+
+    public decimal ToplamTutar()
+        => _kalemler.Sum(k => k.BirimFiyat.Deger * k.Adet);
+    //  ↑ toplam hesabı root'ta — her zaman güncel, dışarıdan değiştirilemiyor
+
+    public void OdemeIcinDogrula()
     {
         if (!_kalemler.Any())
-            throw new InvalidOperationException("Boş sipariş onaylanamaz");
-        // invariant: kalemi olmayan sipariş onaylanamaz
-        Durum = SiparisDurumu.Onaylandi;
+            throw new InvalidOperationException("Sepet boş, ödeme yapılamaz");
+        //  ↑ boş sepeti ödemeye gönderme kuralı burada
+    }
+}
+
+// SepetKalemi — alt entity, sadece Sepet içinden yönetiliyor
+public class SepetKalemi
+{
+    public int KitapId { get; private set; }
+    public string KitapBaslik { get; private set; }
+    public Fiyat BirimFiyat { get; private set; }
+    public int Adet { get; private set; }
+
+    internal SepetKalemi(int kitapId, string kitapBaslik, Fiyat birimFiyat, int adet)
+    //       ↑ internal: sadece aynı assembly içinden çağrılabilir (Sepet.UrunEkle)
+    //         bunu yazmasaydık → dışarıdan new SepetKalemi() ile root bypass edilirdi
+    {
+        KitapId = kitapId;
+        KitapBaslik = kitapBaslik;
+        BirimFiyat = birimFiyat;
+        Adet = adet;
+    }
+
+    internal void AdetArtir(int eklenecek)
+    //         ↑ internal: sadece Sepet.UrunEkle çağırabilir — dışarıdan kalem.AdetArtir() yok
+    {
+        if (Adet + eklenecek > 5)
+            throw new InvalidOperationException("Bir üründen en fazla 5 adet olabilir");
+        Adet += eklenecek;
     }
 }
 ```
 
-**Invariant:** Aggregate'in her zaman geçerli tutması gereken kural. `Onayla()` içindeki "boş sipariş onaylanamaz" bir invariant.
+Şimdi servis kodu:
+
+```csharp
+// SepetServisi — iş kuralı yazmıyor, Sepet'e soruyor
+public class SepetServisi
+{
+    private readonly ISepetRepository _sepetRepo;
+
+    public async Task UrunEkleAsync(string kullaniciId, int kitapId, string baslik, decimal fiyat, int adet)
+    {
+        var sepet = await _sepetRepo.GetByKullaniciAsync(kullaniciId)
+                    ?? new Sepet(kullaniciId);
+
+        sepet.UrunEkle(kitapId, baslik, new Fiyat(fiyat), adet);
+        //   ↑ "aynı kitap var mı?", "adet 5'i geçti mi?" — Sepet kontrol ediyor
+        //     SepetServisi bunları bilmek zorunda değil
+
+        await _sepetRepo.KaydetAsync(sepet);
+    }
+
+    public async Task OdemeBaslatAsync(string kullaniciId)
+    {
+        var sepet = await _sepetRepo.GetByKullaniciAsync(kullaniciId);
+
+        sepet.OdemeIcinDogrula();
+        //   ↑ boş mu? Sepet söyler — servis if yazmadı
+
+        var tutar = sepet.ToplamTutar();
+        await _odemeServisi.OdemeAl(kullaniciId, tutar);
+    }
+}
+
+// MobilApiSepetServisi — aynı aggregate, ayrı if yok
+public class MobilApiSepetServisi
+{
+    public async Task UrunEkleAsync(string kullaniciId, int kitapId, string baslik, decimal fiyat, int adet)
+    {
+        var sepet = await _sepetRepo.GetByKullaniciAsync(kullaniciId) ?? new Sepet(kullaniciId);
+        sepet.UrunEkle(kitapId, baslik, new Fiyat(fiyat), adet);
+        // aynı kurallar — kopyalamadık
+        await _sepetRepo.KaydetAsync(sepet);
+    }
+}
+```
+
+---
+
+### Invariant nedir?
+
+Aggregate'in **hiçbir koşulda ihlal edilemeyecek kuralları.**
+
+| Invariant | Nerede korunuyor |
+|---|---|
+| Aynı kitap iki kez eklenemez — miktar artar | `UrunEkle()` |
+| Bir üründen max 5 adet | `UrunEkle()` + `AdetArtir()` |
+| Boş sepet ödemeye gönderilemez | `OdemeIcinDogrula()` |
+| Kalemler dışarıdan doğrudan değiştirilemez | `IReadOnlyList` + `internal` constructor |
+| Kalem adeti dışarıdan değiştirilemez | `AdetArtir()` internal |
 
 ### 500 vs 50k
 
 | | 500 | 50k |
 |---|---|---|
 | **Basit CRUD** | Entity yeterli, aggregate overkill | — |
-| **Karmaşık iş kuralları, çoklu entity** | ✅ Aggregate düşün | ✅ Şart — tutarlılık garantisi |
-| **Overengineering** | Tek entity için aggregate root | — |
+| **Birden fazla entity birlikte tutarlı olmalı** | ✅ Aggregate düşün | ✅ Şart |
+| **Overengineering sinyali** | Tek entity, iş kuralı yok → aggregate açma | — |
 
 ---
 

@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>.NET Öğrenim Kitabı</title>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/docsify@4/lib/themes/vue.css">
+
+  <style>
+    /* ── Temel değişkenler — Microsoft Docs paleti ── */
+    :root {
+      --base-font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+      --code-font-family: "Cascadia Code", "Consolas", "Courier New", monospace;
+      --base-font-size: 15px;
+      --base-line-height: 1.75;
+
+      --theme-color: #0078d4;
+      --sidebar-width: 280px;
+
+      --ms-blue:        #0078d4;
+      --ms-blue-hover:  #106ebe;
+      --ms-blue-light:  #eff6fc;
+      --ms-blue-mid:    #deecf9;
+
+      --bg:             #ffffff;
+      --sidebar-bg:     #f8f8f8;
+      --border:         #e0e0e0;
+      --text-primary:   #1b1b1b;
+      --text-secondary: #616161;
+      --text-muted:     #8c8c8c;
+
+      --code-bg:        #f6f8fa;
+      --code-border:    #e1e4e8;
+      --inline-code-bg: #eff1f3;
+      --inline-code-fg: #c7254e;
+    }
+
+    /* ── Reset & body ── */
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      background: var(--bg) !important;
+      color: var(--text-primary) !important;
+      font-family: var(--base-font-family) !important;
+      font-size: var(--base-font-size) !important;
+      line-height: var(--base-line-height) !important;
+    }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      background: var(--sidebar-bg) !important;
+      border-right: 1px solid var(--border) !important;
+      padding-top: 0 !important;
+    }
+
+    .sidebar > h1 {
+      background: var(--ms-blue) !important;
+      margin: 0 !important;
+      padding: 16px 20px !important;
+    }
+
+    .app-name-link {
+      color: #ffffff !important;
+      font-size: 15px !important;
+      font-weight: 600 !important;
+    }
+
+    /* Arama */
+    .search {
+      padding: 10px 14px !important;
+      border-bottom: 1px solid var(--border) !important;
+      background: var(--sidebar-bg) !important;
+    }
+
+    .search input {
+      background: #ffffff !important;
+      border: 1px solid var(--border) !important;
+      border-radius: 4px !important;
+      color: var(--text-primary) !important;
+      font-family: var(--base-font-family) !important;
+      font-size: 13px !important;
+      padding: 6px 10px !important;
+      width: 100% !important;
+      transition: border-color 0.15s !important;
+    }
+
+    .search input:focus {
+      border-color: var(--ms-blue) !important;
+      outline: none !important;
+      box-shadow: 0 0 0 2px var(--ms-blue-mid) !important;
+    }
+
+    .search input::placeholder { color: var(--text-muted) !important; }
+
+    /* Sidebar nav */
+    .sidebar-nav {
+      padding: 8px 0 40px !important;
+    }
+
+    .sidebar-nav ul {
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+
+    .sidebar-nav ul li {
+      list-style: none !important;
+      margin: 0 !important;
+    }
+
+    .sidebar-nav ul li a {
+      color: var(--text-primary) !important;
+      display: block !important;
+      font-size: 13.5px !important;
+      padding: 5px 14px 5px 18px !important;
+      border-radius: 0 !important;
+      text-decoration: none !important;
+      transition: background 0.1s, color 0.1s !important;
+      border-left: 3px solid transparent !important;
+      white-space: nowrap !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+    }
+
+    .sidebar-nav ul li a:hover {
+      background: var(--ms-blue-mid) !important;
+      color: var(--ms-blue) !important;
+      border-left-color: var(--ms-blue) !important;
+    }
+
+    .sidebar-nav ul li.active > a {
+      background: var(--ms-blue-light) !important;
+      color: var(--ms-blue) !important;
+      font-weight: 600 !important;
+      border-left-color: var(--ms-blue) !important;
+    }
+
+    /* Bölüm başlıkları */
+    .sidebar-nav ul > li > p,
+    .sidebar-nav ul > li > strong {
+      color: var(--text-muted) !important;
+      font-size: 10.5px !important;
+      font-weight: 700 !important;
+      letter-spacing: 0.9px !important;
+      margin: 16px 0 2px !important;
+      padding: 0 14px !important;
+      text-transform: uppercase !important;
+    }
+
+    /* HR ayraçlar */
+    .sidebar-nav > ul > li > hr,
+    .sidebar hr {
+      border: none !important;
+      border-top: 1px solid var(--border) !important;
+      margin: 10px 14px !important;
+    }
+
+    /* ── İçerik alanı ── */
+    .content {
+      background: var(--bg) !important;
+    }
+
+    .markdown-section {
+      max-width: 900px !important;
+      padding: 36px 48px 80px !important;
+    }
+
+    /* ── Başlıklar ── */
+    .markdown-section h1 {
+      color: var(--text-primary) !important;
+      font-size: 1.9rem !important;
+      font-weight: 600 !important;
+      border-bottom: 2px solid var(--ms-blue) !important;
+      padding-bottom: 10px !important;
+      margin-bottom: 24px !important;
+      letter-spacing: -0.3px !important;
+    }
+
+    .markdown-section h2 {
+      color: var(--text-primary) !important;
+      font-size: 1.3rem !important;
+      font-weight: 600 !important;
+      border-bottom: 1px solid var(--border) !important;
+      padding-bottom: 6px !important;
+      margin-top: 40px !important;
+      margin-bottom: 16px !important;
+    }
+
+    .markdown-section h3 {
+      color: var(--text-primary) !important;
+      font-size: 1.05rem !important;
+      font-weight: 600 !important;
+      margin-top: 28px !important;
+    }
+
+    .markdown-section h4 {
+      color: var(--text-secondary) !important;
+      font-size: 0.95rem !important;
+      font-weight: 600 !important;
+    }
+
+    /* ── Kod blokları ── */
+    .markdown-section pre {
+      background: var(--code-bg) !important;
+      border: 1px solid var(--code-border) !important;
+      border-radius: 6px !important;
+      padding: 16px 20px !important;
+      overflow-x: auto !important;
+    }
+
+    .markdown-section pre code {
+      background: transparent !important;
+      color: var(--text-primary) !important;
+      font-family: var(--code-font-family) !important;
+      font-size: 13.5px !important;
+      line-height: 1.65 !important;
+      padding: 0 !important;
+    }
+
+    /* Satır içi kod */
+    .markdown-section :not(pre) > code {
+      background: var(--inline-code-bg) !important;
+      color: var(--inline-code-fg) !important;
+      border-radius: 3px !important;
+      font-family: var(--code-font-family) !important;
+      font-size: 13px !important;
+      padding: 2px 5px !important;
+      border: 1px solid var(--code-border) !important;
+    }
+
+    /* Copy butonu */
+    .docsify-copy-code-button {
+      background: #ffffff !important;
+      color: var(--text-secondary) !important;
+      border: 1px solid var(--border) !important;
+      border-radius: 4px !important;
+      font-family: var(--base-font-family) !important;
+      font-size: 11px !important;
+    }
+
+    .docsify-copy-code-button:hover {
+      background: var(--ms-blue) !important;
+      color: #ffffff !important;
+      border-color: var(--ms-blue) !important;
+    }
+
+    /* ── Tablolar ── */
+    .markdown-section table {
+      border-collapse: collapse !important;
+      font-size: 14px !important;
+      margin: 20px 0 !important;
+      width: 100% !important;
+    }
+
+    .markdown-section th {
+      background: #f0f0f0 !important;
+      border: 1px solid var(--border) !important;
+      color: var(--text-primary) !important;
+      font-weight: 600 !important;
+      padding: 9px 14px !important;
+      text-align: left !important;
+    }
+
+    .markdown-section td {
+      border: 1px solid var(--border) !important;
+      color: var(--text-primary) !important;
+      padding: 8px 14px !important;
+    }
+
+    .markdown-section tbody tr:nth-child(even) td {
+      background: #fafafa !important;
+    }
+
+    .markdown-section tbody tr:hover td {
+      background: var(--ms-blue-light) !important;
+    }
+
+    /* ── Blockquote ── */
+    .markdown-section blockquote {
+      background: var(--ms-blue-light) !important;
+      border-left: 4px solid var(--ms-blue) !important;
+      border-radius: 0 4px 4px 0 !important;
+      color: var(--text-secondary) !important;
+      margin: 16px 0 !important;
+      padding: 12px 18px !important;
+    }
+
+    .markdown-section blockquote p { margin: 0 !important; }
+
+    /* ── Linkler ── */
+    .markdown-section a {
+      color: var(--ms-blue) !important;
+      text-decoration: none !important;
+    }
+
+    .markdown-section a:hover {
+      color: var(--ms-blue-hover) !important;
+      text-decoration: underline !important;
+    }
+
+    /* ── HR ── */
+    .markdown-section hr {
+      border: none !important;
+      border-top: 1px solid var(--border) !important;
+      margin: 36px 0 !important;
+    }
+
+    /* ── Lists ── */
+    .markdown-section ul li,
+    .markdown-section ol li {
+      color: var(--text-primary) !important;
+      margin-bottom: 4px !important;
+    }
+
+    /* ── Strong ── */
+    .markdown-section strong { color: var(--text-primary) !important; }
+
+    /* ── Sayfa geçiş ── */
+    .docsify-pagination-container {
+      border-top: 1px solid var(--border) !important;
+      margin-top: 48px !important;
+      padding-top: 20px !important;
+    }
+
+    .pagination-item {
+      background: #ffffff !important;
+      border: 1px solid var(--border) !important;
+      border-radius: 6px !important;
+      padding: 12px 16px !important;
+      transition: border-color 0.15s, box-shadow 0.15s !important;
+    }
+
+    .pagination-item:hover {
+      border-color: var(--ms-blue) !important;
+      box-shadow: 0 2px 8px rgba(0,120,212,0.12) !important;
+    }
+
+    .pagination-item__title { color: var(--ms-blue) !important; font-size: 14px !important; }
+
+    .pagination-item__label {
+      color: var(--text-muted) !important;
+      font-size: 11px !important;
+      text-transform: uppercase !important;
+    }
+
+    /* ── Progress bar ── */
+    #nprogress .bar { background: var(--ms-blue) !important; }
+
+    /* ── Sidebar toggle butonu (mobile) ── */
+    .sidebar-toggle {
+      background: var(--sidebar-bg) !important;
+      border-color: var(--border) !important;
+    }
+
+    .sidebar-toggle span {
+      background-color: var(--ms-blue) !important;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      .markdown-section {
+        padding: 20px 18px 60px !important;
+      }
+
+      .markdown-section h1 { font-size: 1.45rem !important; }
+      .markdown-section h2 { font-size: 1.15rem !important; }
+
+      .markdown-section pre {
+        padding: 12px 14px !important;
+        font-size: 12.5px !important;
+      }
+
+      .markdown-section table {
+        display: block !important;
+        overflow-x: auto !important;
+        white-space: nowrap !important;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .markdown-section { padding: 16px 14px 48px !important; }
+      .markdown-section h1 { font-size: 1.3rem !important; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">Yükleniyor...</div>
+
+  <script>
+    window.$docsify = {
+      name: '.NET Öğrenim Kitabı',
+      nameLink: '/',
+      loadSidebar: true,
+      auto2top: true,
+      maxLevel: 4,
+      subMaxLevel: 2,
+      notFoundPage: true,
+      relativePath: false,
+
+      search: {
+        maxAge: 86400000,
+        paths: 'auto',
+        placeholder: 'Ara...',
+        noData: 'Sonuç bulunamadı',
+        depth: 3,
+        namespace: 'dotnet-kitap-v4',
+      },
+
+      copyCode: {
+        buttonText: 'Kopyala',
+        errorText: '✗',
+        successText: '✓',
+      },
+
+      pagination: {
+        previousText: '← Önceki',
+        nextText: 'Sonraki →',
+        crossChapter: true,
+        crossChapterText: true,
+      },
+    };
+  </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/docsify@4/lib/docsify.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docsify@4/lib/plugins/search.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docsify-copy-code@2/dist/docsify-copy-code.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docsify-pagination/dist/docsify-pagination.min.js"></script>
+
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-csharp.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-json.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-bash.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-sql.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-yaml.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-docker.min.js"></script>
+</body>
+</html>

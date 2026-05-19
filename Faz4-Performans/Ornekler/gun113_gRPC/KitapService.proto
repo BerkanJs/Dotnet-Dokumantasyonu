@@ -1,0 +1,61 @@
+// GÜN 113 — gRPC Service: .proto dosyası
+// Bu dosyadan C# kodu otomatik üretilir: dotnet build
+
+syntax = "proto3";
+
+option csharp_namespace = "Ornekler.gun113";
+
+package kitap;
+
+// --- Unary RPC: tek istek → tek yanıt (HTTP GET/POST gibi) ---
+service KitapService {
+  rpc KitapGetir (KitapGetirIstegi) returns (KitapYaniti);
+
+  // Server streaming: tek istek → akış yanıt
+  rpc KitaplariListele (ListeleIstegi) returns (stream KitapYaniti);
+
+  // Client streaming: akış istek → tek yanıt
+  rpc TopluKitapEkle (stream KitapEkleIstegi) returns (EkleSonucu);
+
+  // Bidirectional streaming: akış istek → akış yanıt
+  rpc StokGuncelleAkisi (stream StokGuncelleIstegi) returns (stream StokSonucu);
+}
+
+message KitapGetirIstegi {
+  int32 id = 1;  // field number: binary protocol'de identifier, değiştirme!
+}
+
+message KitapYaniti {
+  int32 id = 1;
+  string ad = 2;
+  string yazar = 3;
+  double fiyat = 4;
+  int32 stok = 5;
+}
+
+message ListeleIstegi {
+  string kategori = 1;
+  int32 sayfa_boyutu = 2;
+}
+
+message KitapEkleIstegi {
+  string ad = 1;
+  string yazar = 2;
+  double fiyat = 3;
+}
+
+message EkleSonucu {
+  int32 eklenen_sayisi = 1;
+  repeated int32 olusturulan_idler = 2;  // repeated = array/list
+}
+
+message StokGuncelleIstegi {
+  int32 kitap_id = 1;
+  int32 yeni_stok = 2;
+}
+
+message StokSonucu {
+  int32 kitap_id = 1;
+  bool basarili = 2;
+  string hata_mesaji = 3;
+}
