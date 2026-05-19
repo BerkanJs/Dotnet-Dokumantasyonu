@@ -15,13 +15,18 @@ DotnetDoku/
 ├── Faz1-CSharp-CLR/        C# ve CLR temelleri
 ├── Faz2-ASPNET-MVC/        ASP.NET Core MVC + EF Core + Test
 │   └── KitabeviMVC/        Çalışan uygulama
-├── Faz3-Mimari/            SOLID + Design Patterns + Onion + CQRS  ← şu an burada
+├── Faz3-Mimari/            SOLID + Design Patterns + Onion + CQRS
 │   ├── 01-SOLID/           Her prensip için izole demo
 │   ├── 02-DesignPatterns/  Creational, Structural, Behavioral
 │   ├── 03-OnionArchitecture/   KitabeviMVC → Onion refactor
 │   └── 04-CQRS/            MediatR + Pipeline Behaviors
-├── Faz4-Performans/        BenchmarkDotNet, Redis, SQL Index
-└── Faz5-Mikroservisler/    Docker, RabbitMQ, YARP, Saga
+├── Faz4-Performans/        BenchmarkDotNet, Redis, SQL Index, gRPC, SignalR
+└── Faz5-Mikroservisler/    YARP, RabbitMQ, Kafka, Saga  ← şu an burada
+    ├── ApiGateway/          YARP reverse proxy
+    ├── CatalogService/      Faz3 Onion → mikroservis
+    ├── OrderService/        Saga + Outbox + RabbitMQ
+    ├── NotificationService/ RabbitMQ consumer
+    └── docker/              docker-compose
 ```
 
 ---
@@ -84,40 +89,9 @@ DotnetDoku/
 
 `Faz2-ASPNET-MVC/KitabeviMVC/` — tüm Faz2 kavramlarını çalışan kod üzerinde gösteren ASP.NET Core MVC uygulaması.
 
-```
-Controllers/
-  KitapController.cs        MVC CRUD, view döndürür
-  KitapApiController.cs     REST API, JSON, versioning (v1/v2)
-  HesapController.cs        Cookie auth — giriş/çıkış
-
-Services/
-  IKitapServisi.cs          Async arayüz
-  EfKitapServisi.cs         EF Core — AsNoTracking, Change Tracker, compiled query
-  CachedKitapServisi.cs     Decorator pattern — cache katmanı
-  IKitapSorguServisi.cs     IQueryable, Include, AsSplitQuery
-  IKitapBatchServisi.cs     ExecuteUpdate/Delete — toplu operasyonlar
-  KitapApiIstemcisi.cs      Typed HTTP Client — dış API adapter
-
-Repositories/
-  IRepository.cs / EfRepository.cs     Generic repository
-  IKitapRepository.cs / EfKitapRepository.cs
-  IUnitOfWork.cs / EfUnitOfWork.cs
-
-Features/ (CQRS + MediatR)
-  Kitaplar/Queries/         IRequest<T> sorgu handler'ları
-  Kitaplar/Commands/        IRequest<T> komut handler'ları
-  Behaviours/               Pipeline: logging, validation
-
-Data/
-  KitabeviDbContext.cs      DbContext, Fluent API, ilişkiler
-
-Filters/
-  ValidationFilter, PerformansFilter, AuditFilter, GlobalHataFilter
-```
-
 ---
 
-## Faz 3 — Mimari ve Design Patterns 🔄 (devam ediyor)
+## Faz 3 — Mimari ve Design Patterns ✅
 
 | Gün | Dosya | Konu |
 |-----|-------|------|
@@ -125,29 +99,95 @@ Filters/
 | 47 | [gun47_ocp.md](Faz3-Mimari/gun47_ocp.md) | Open/Closed Principle |
 | 48 | [gun48_lsp_isp.md](Faz3-Mimari/gun48_lsp_isp.md) | Liskov Substitution + Interface Segregation |
 | 49 | [gun49_dip.md](Faz3-Mimari/gun49_dip.md) | Dependency Inversion Principle |
-| 50 | [gun50_solid_sentez.md](Faz3-Mimari/gun50_solid_sentez.md) | SOLID Sentez — teknik borç, test edilebilirlik |
+| 50 | [gun50_solid_sentez.md](Faz3-Mimari/gun50_solid_sentez.md) | SOLID Sentez |
 | 51 | [gun51_creational_patterns.md](Faz3-Mimari/gun51_creational_patterns.md) | Factory Method, Builder, Singleton |
 | 52 | [gun52_hafta7_ozet.md](Faz3-Mimari/gun52_hafta7_ozet.md) | Hafta 7 özet |
 | 53 | [gun53_structural_patterns.md](Faz3-Mimari/gun53_structural_patterns.md) | Decorator, Adapter, Facade |
 | 54 | [gun54_behavioral_patterns_1.md](Faz3-Mimari/gun54_behavioral_patterns_1.md) | Strategy, Observer, Command |
 | 55 | [gun55_behavioral_patterns_2.md](Faz3-Mimari/gun55_behavioral_patterns_2.md) | Mediator, State, Iterator |
+| 56 | [gun56_anti_patterns.md](Faz3-Mimari/gun56_anti_patterns.md) | Anti-Patterns |
+| 57 | [gun57_ddd_taktiksel.md](Faz3-Mimari/gun57_ddd_taktiksel.md) | DDD Taktiksel |
+| 58 | [gun58_hafta8_ozet.md](Faz3-Mimari/gun58_hafta8_ozet.md) | Hafta 8 özet |
+| 58b | [gun58_onion_architecture.md](Faz3-Mimari/gun58_onion_architecture.md) | Onion Architecture |
+| 59 | [gun59_onion_uygulama.md](Faz3-Mimari/gun59_onion_uygulama.md) | Onion Uygulama |
+| 60 | [gun60_cqrs_mediatr.md](Faz3-Mimari/gun60_cqrs_mediatr.md) | CQRS & MediatR (derin) |
+| 61 | [gun61_hafta_ozet.md](Faz3-Mimari/gun61_hafta_ozet.md) | Hafta özet |
+| 61b | [gun61_kitap_ekle_usecase.md](Faz3-Mimari/gun61_kitap_ekle_usecase.md) | Kitap Ekle Use Case |
+| 62 | [gun62_decorator_cache.md](Faz3-Mimari/gun62_decorator_cache.md) | Decorator & Cache |
+| 63 | [gun63_mediatr_pipeline_behaviors.md](Faz3-Mimari/gun63_mediatr_pipeline_behaviors.md) | MediatR Pipeline Behaviors |
+| 64 | [gun64_result_pattern_ve_hata_yonetimi.md](Faz3-Mimari/gun64_result_pattern_ve_hata_yonetimi.md) | Result Pattern & Hata Yönetimi |
+| 65 | [gun65_hafta9_ozet.md](Faz3-Mimari/gun65_hafta9_ozet.md) | Hafta 9 özet |
+| 66 | [gun66_event_driven_architecture_temelleri.md](Faz3-Mimari/gun66_event_driven_architecture_temelleri.md) | Event-Driven Architecture |
+| 67 | [gun67_specification_pattern.md](Faz3-Mimari/gun67_specification_pattern.md) | Specification Pattern |
+| 68 | [gun68_unit_of_work.md](Faz3-Mimari/gun68_unit_of_work.md) | Unit of Work |
+| 69 | [gun69_validation_stratejileri.md](Faz3-Mimari/gun69_validation_stratejileri.md) | Validation Stratejileri |
+| 70 | [gun70_vertical_slice.md](Faz3-Mimari/gun70_vertical_slice.md) | Vertical Slice Architecture |
+| 71 | [gun71_moduler_monolith.md](Faz3-Mimari/gun71_moduler_monolith.md) | Modüler Monolith |
+| 72 | [gun72_hafta10_ozet_faz3_kapanis.md](Faz3-Mimari/gun72_hafta10_ozet_faz3_kapanis.md) | Hafta 10 Özeti & Faz3 Kapanış |
 
-### Demo Projeleri
+---
 
-```
-Faz3-Mimari/
-├── 01-SOLID/
-│   ├── SrpDemo/        SRP: UserService god class → ayrılmış servisler
-│   ├── OcpDemo/        OCP: if/switch → IIndirimStrategy
-│   ├── LspIspDemo/     LSP: DijitalKitap kalıtım sorunu / ISP: fat interface bölme
-│   └── DipDemo/        DIP: IKitapRepository domain'de, EfKitapRepository infrastructure'da
-│
-└── 02-DesignPatterns/
-    ├── CreationalDemo/ Factory Method (exporter), Builder (fluent sorgu)
-    ├── StructuralDemo/ Decorator (cache), Adapter (dış API), Facade (sipariş akışı)
-    ├── BehavioralDemo1/ Strategy (sıralama), Observer (event), Command (undo)
-    └── BehavioralDemo2/ Mediator (handler yönlendirme), State (sipariş durumu), Iterator (yield/async)
-```
+## Faz 4 — Performans & İleri Konular ✅
+
+| Gün | Dosya | Konu |
+|-----|-------|------|
+| 73 | [gun73_allocation_benchmarkdotnet.md](Faz4-Performans/gun73_allocation_benchmarkdotnet.md) | BenchmarkDotNet & Allokasyon |
+| 74 | [gun74_span_memory_arraypool.md](Faz4-Performans/gun74_span_memory_arraypool.md) | Span, Memory & ArrayPool |
+| 75 | [gun75_struct_readonly_ref.md](Faz4-Performans/gun75_struct_readonly_ref.md) | Struct, Readonly & Ref |
+| 76 | [gun76_string_optimizasyonlari.md](Faz4-Performans/gun76_string_optimizasyonlari.md) | String Optimizasyonları |
+| 77 | [gun77_async_performans_valuetask.md](Faz4-Performans/gun77_async_performans_valuetask.md) | Async Performans & ValueTask |
+| 78 | [gun78_memory_leak.md](Faz4-Performans/gun78_memory_leak.md) | Memory Leak Tespiti |
+| 79 | [gun79_production_diagnostics.md](Faz4-Performans/gun79_production_diagnostics.md) | Production Diagnostics |
+| 80 | [gun80_streams_pipelines.md](Faz4-Performans/gun80_streams_pipelines.md) | Streams & Pipelines |
+| 81 | [gun81_hafta11_ozet.md](Faz4-Performans/gun81_hafta11_ozet.md) | Hafta 11 özet |
+| 82 | [gun82_thread_safety.md](Faz4-Performans/gun82_thread_safety.md) | Thread Safety |
+| 83 | [gun83_tpl.md](Faz4-Performans/gun83_tpl.md) | TPL (Task Parallel Library) |
+| 84 | [gun84_channel_producer_consumer.md](Faz4-Performans/gun84_channel_producer_consumer.md) | Channel & Producer-Consumer |
+| 85 | [gun85_threadpool_task_scheduling.md](Faz4-Performans/gun85_threadpool_task_scheduling.md) | ThreadPool & Task Scheduling |
+| 86 | [gun86_immutability_functional.md](Faz4-Performans/gun86_immutability_functional.md) | Immutability & Functional Style |
+| 88 | [gun88_compression_caching_cdn.md](Faz4-Performans/gun88_compression_caching_cdn.md) | Compression, Caching & CDN |
+| 89 | [gun89_rate_limiting.md](Faz4-Performans/gun89_rate_limiting.md) | Rate Limiting |
+| 90 | [gun90_minimal_api_performance.md](Faz4-Performans/gun90_minimal_api_performance.md) | Minimal API Performans |
+| 91 | [gun91_sql_index_stratejisi.md](Faz4-Performans/gun91_sql_index_stratejisi.md) | SQL Index Stratejisi |
+| 92 | [gun92_redis_distributed_cache.md](Faz4-Performans/gun92_redis_distributed_cache.md) | Redis Distributed Cache |
+| 93 | [gun93_health_checks.md](Faz4-Performans/gun93_health_checks.md) | Health Checks |
+| 94 | [gun94_hafta13_ozet.md](Faz4-Performans/gun94_hafta13_ozet.md) | Hafta 13 özet |
+| 95 | [gun95_soft_delete_query_filters.md](Faz4-Performans/gun95_soft_delete_query_filters.md) | Soft Delete & Query Filters |
+| 96 | [gun96_audit_trail.md](Faz4-Performans/gun96_audit_trail.md) | Audit Trail |
+| 97 | [gun97_optimistic_concurrency.md](Faz4-Performans/gun97_optimistic_concurrency.md) | Optimistic Concurrency |
+| 98 | [gun98_multi_tenancy.md](Faz4-Performans/gun98_multi_tenancy.md) | Multi-Tenancy |
+| 99 | [gun99_ef_core_interceptors.md](Faz4-Performans/gun99_ef_core_interceptors.md) | EF Core Interceptors |
+| 100 | [gun100_idempotency.md](Faz4-Performans/gun100_idempotency.md) | Idempotency |
+| 101 | [gun101_structured_logging.md](Faz4-Performans/gun101_structured_logging.md) | Yapısal Loglama |
+| 102 | [gun102_problem_details.md](Faz4-Performans/gun102_problem_details.md) | Problem Details |
+| 103 | [gun103_data_protection_sifreleme.md](Faz4-Performans/gun103_data_protection_sifreleme.md) | Data Protection & Şifreleme |
+| 104 | [gun104_domain_event_dispatch.md](Faz4-Performans/gun104_domain_event_dispatch.md) | Domain Event Dispatch |
+| 105 | [gun105_feature_flags.md](Faz4-Performans/gun105_feature_flags.md) | Feature Flags |
+| 106 | [gun106_oauth_jwt_api_key.md](Faz4-Performans/gun106_oauth_jwt_api_key.md) | OAuth, JWT & API Key |
+| 107 | [gun107_cors_csrf.md](Faz4-Performans/gun107_cors_csrf.md) | CORS & CSRF |
+| 108 | [gun108_sql_injection_xss_headers.md](Faz4-Performans/gun108_sql_injection_xss_headers.md) | SQL Injection, XSS & Headers |
+| 109 | [gun109_owasp_api_top10.md](Faz4-Performans/gun109_owasp_api_top10.md) | OWASP API Top 10 |
+| 110 | [gun110_hybrid_cache.md](Faz4-Performans/gun110_hybrid_cache.md) | Hybrid Cache |
+| 111 | [gun111_identity_server_keycloak_oidc.md](Faz4-Performans/gun111_identity_server_keycloak_oidc.md) | Identity Server & Keycloak OIDC |
+| 112 | [gun112_grpc_protobuf_temelleri.md](Faz4-Performans/gun112_grpc_protobuf_temelleri.md) | gRPC & Protobuf Temelleri |
+| 113 | [gun113_grpc_service_types_aspnetcore.md](Faz4-Performans/gun113_grpc_service_types_aspnetcore.md) | gRPC Service Types & ASP.NET Core |
+| 114 | [gun114_grpc_json_transcoding_rest_vs_grpc.md](Faz4-Performans/gun114_grpc_json_transcoding_rest_vs_grpc.md) | gRPC JSON Transcoding & REST vs gRPC |
+| 115 | [gun115_realtime_temelleri_signalr_giris.md](Faz4-Performans/gun115_realtime_temelleri_signalr_giris.md) | Realtime Temelleri & SignalR Giriş |
+| 116 | [gun116_signalr_hub_groups_connections.md](Faz4-Performans/gun116_signalr_hub_groups_connections.md) | SignalR Hub, Groups & Connections |
+| 117 | [gun117_signalr_scale_out_auth_resilience.md](Faz4-Performans/gun117_signalr_scale_out_auth_resilience.md) | SignalR Scale-Out, Auth & Resilience |
+| 118 | [gun118_signalr_vs_grpc_karsilastirma.md](Faz4-Performans/gun118_signalr_vs_grpc_karsilastirma.md) | SignalR vs gRPC Karşılaştırma |
+
+---
+
+## Faz 5 — Mikroservisler 🔄 (devam ediyor)
+
+| Gün | Dosya | Konu |
+|-----|-------|------|
+| 119 | [gun119_monolith_microservice.md](Faz5-Mikroservisler/gun119_monolith_microservice.md) | Monolith → Microservice: Ne Zaman? |
+| 120 | [gun120_bounded_context.md](Faz5-Mikroservisler/gun120_bounded_context.md) | Bounded Context ve Servis Sınırları |
+| 121 | [gun121_servisler_arasi_iletisim.md](Faz5-Mikroservisler/gun121_servisler_arasi_iletisim.md) | Servisler Arası İletişim |
+| 122 | [gun122_api_gateway.md](Faz5-Mikroservisler/gun122_api_gateway.md) | API Gateway & YARP |
+| 123 | [gun123_service_discovery.md](Faz5-Mikroservisler/gun123_service_discovery.md) | Service Discovery & Load Balancing |
 
 ---
 
@@ -157,11 +197,11 @@ Faz3-Mimari/
 |-----------|-----|
 | .NET 9 / C# 13 | Tüm fazlar |
 | ASP.NET Core MVC | Faz 2 |
-| Entity Framework Core 9 | Faz 2 |
+| Entity Framework Core 9 | Faz 2–3 |
 | MediatR | Faz 2–3 |
 | Serilog | Faz 2 |
 | xUnit, Moq, FluentAssertions, TestContainers | Faz 2 |
 | NetArchTest | Faz 2–3 |
 | Docker, docker-compose | Faz 2–5 |
-| BenchmarkDotNet, Redis | Faz 4 |
-| RabbitMQ, YARP, Saga | Faz 5 |
+| BenchmarkDotNet, Redis, SignalR, gRPC | Faz 4 |
+| YARP, RabbitMQ, Kafka, Saga, .NET Aspire | Faz 5 |
