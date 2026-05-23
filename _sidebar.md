@@ -177,3 +177,17 @@
 - [Gün 121 · Servisler Arası İletişim](Faz5-Mikroservisler/gun121_servisler_arasi_iletisim.md)
 - [Gün 122 · API Gateway & YARP](Faz5-Mikroservisler/gun122_api_gateway.md)
 - [Gün 123 · Service Discovery & Load Balancing](Faz5-Mikroservisler/gun123_service_discovery.md)
+- [Gün 124 · Hafta 17 Özeti](Faz5-Mikroservisler/gun124_hafta17_ozet.md)
+
+- **Hafta 18 — Message Broker'lar**
+- [Gün 125 · RabbitMQ: Kavramsal Derinlik](Faz5-Mikroservisler/gun125_rabbitmq.md)
+- [Gün 126 · Kafka](Faz5-Mikroservisler/gun126_kafka.md)
+- [Gün 127 · Outbox Pattern](Faz5-Mikroservisler/gun127_outbox_pattern.md)
+- [Gün 128 · Saga Pattern](Faz5-Mikroservisler/gun128_saga_pattern.md)
+- [Gün 129 · Hafta 18 Özeti](Faz5-Mikroservisler/gun129_hafta18_ozet.md)
+
+- **Hafta 19 — Resilience & Fault Tolerance**
+- [Gün 130 · Circuit Breaker Pattern](Faz5-Mikroservisler/gun130_circuit_breaker.md)
+- [Gün 131 · Retry ve Timeout Stratejileri](Faz5-Mikroservisler/gun131_retry_timeout.md)
+- [Gün 132 · Bulkhead Pattern](Faz5-Mikroservisler/gun132_bulkhead.md)
+- [Gün 133 · Fallback ve Graceful Degradation](Faz5-Mikroservisler/gun133_fallback_graceful_degradation.md)

@@ -188,6 +188,8 @@ DotnetDoku/
 | 121 | [gun121_servisler_arasi_iletisim.md](Faz5-Mikroservisler/gun121_servisler_arasi_iletisim.md) | Servisler Arası İletişim |
 | 122 | [gun122_api_gateway.md](Faz5-Mikroservisler/gun122_api_gateway.md) | API Gateway & YARP |
 | 123 | [gun123_service_discovery.md](Faz5-Mikroservisler/gun123_service_discovery.md) | Service Discovery & Load Balancing |
+| 124 | [gun124_hafta17_ozet.md](Faz5-Mikroservisler/gun124_hafta17_ozet.md) | Hafta 17 Özeti |
+| 125 | [gun125_rabbitmq.md](Faz5-Mikroservisler/gun125_rabbitmq.md) | RabbitMQ: AMQP, Exchange, DLQ, MassTransit |
 
 ---
 

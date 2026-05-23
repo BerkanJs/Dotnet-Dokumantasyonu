@@ -1,0 +1,180 @@
+version: '3.8'
+
+services:
+
+  # ─── Altyapı ───────────────────────────────────────────────────────────────
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"  # Management UI: http://localhost:15672 (guest/guest)
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - ecommerce-net
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: zookeeper
+    networks:
+      - ecommerce-net
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo ruok | nc localhost 2181"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: kafka
+    ports:
+      - "9092:9092"
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    networks:
+      - ecommerce-net
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_RETENTION_HOURS: 168
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+
+  # ─── Servisler ─────────────────────────────────────────────────────────────
+  # NOT: context her serviste "../src" — Shared/Contracts'a erişim için gerekli
+  # dockerfile: hangi Dockerfile'ın kullanılacağını belirtir
+
+  # Gün 130 — Circuit Breaker: OrderService bu servise HTTP ile bağlanır
+  product-service:
+    build:
+      context: ../src
+      dockerfile: ProductService/Dockerfile
+    container_name: product-service
+    ports:
+      - "5005:8080"
+    networks:
+      - ecommerce-net
+
+  # Gün 125 — RabbitMQ | Gün 127 — Outbox | Gün 128 — Saga
+  # Gün 130-133 — CB + Retry + Bulkhead + Fallback pipeline
+  order-service:
+    build:
+      context: ../src
+      dockerfile: OrderService/Dockerfile
+    container_name: order-service
+    ports:
+      - "5002:8080"
+    environment:
+      RabbitMQ__Host:              rabbitmq
+      RabbitMQ__Username:          guest
+      RabbitMQ__Password:          guest
+      ProductService__BaseUrl:     http://product-service:8080/
+      Features__RealTimeStockCheck: "true"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - ecommerce-net
+
+  # Gün 128-129 — Saga: PaymentRequested event'ini işler
+  payment-service:
+    build:
+      context: ../src
+      dockerfile: PaymentService/Dockerfile
+    container_name: payment-service
+    environment:
+      RabbitMQ__Host:     rabbitmq
+      RabbitMQ__Username: guest
+      RabbitMQ__Password: guest
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - ecommerce-net
+
+  # Gün 129 — Saga: ödeme sonrası kargo hazırlama
+  shipment-service:
+    build:
+      context: ../src
+      dockerfile: ShipmentService/Dockerfile
+    container_name: shipment-service
+    environment:
+      RabbitMQ__Host:     rabbitmq
+      RabbitMQ__Username: guest
+      RabbitMQ__Password: guest
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - ecommerce-net
+
+  # Gün 125 — OrderCreated | Gün 129 — OrderCompleted/Cancelled/PaymentRefunded
+  notification-service:
+    build:
+      context: ../src
+      dockerfile: NotificationService/Dockerfile
+    container_name: notification-service
+    environment:
+      RabbitMQ__Host:     rabbitmq
+      RabbitMQ__Username: guest
+      RabbitMQ__Password: guest
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - ecommerce-net
+
+  # Gün 126 — Kafka consumer: sipariş istatistikleri
+  analytics-service:
+    build:
+      context: ../src
+      dockerfile: AnalyticsService/Dockerfile
+    container_name: analytics-service
+    environment:
+      Kafka__BootstrapServers: kafka:29092
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - ecommerce-net
+
+  # Gün 122 — YARP API Gateway: tek giriş noktası
+  api-gateway:
+    build:
+      context: ../src
+      dockerfile: ApiGateway/Dockerfile
+    container_name: api-gateway
+    ports:
+      - "5000:8080"
+    networks:
+      - ecommerce-net
+
+networks:
+  ecommerce-net:
+    driver: bridge
+
+volumes:
+  rabbitmq_data:
